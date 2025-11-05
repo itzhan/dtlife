@@ -45,10 +45,11 @@ export function verifySession(token: string | undefined | null): AdminSession | 
 export async function setAdminCookie(session: AdminSession) {
   const token = signSession(session)
   const store = await cookies()
+  const useSecureCookie = process.env.ADMIN_COOKIE_SECURE === 'true'
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: useSecureCookie,
     path: '/',
     maxAge: session.exp - Math.floor(Date.now() / 1000),
   })
@@ -56,7 +57,8 @@ export async function setAdminCookie(session: AdminSession) {
 
 export async function clearAdminCookie() {
   const store = await cookies()
-  store.set(COOKIE_NAME, '', { path: '/', maxAge: 0 })
+  const useSecureCookie = process.env.ADMIN_COOKIE_SECURE === 'true'
+  store.set(COOKIE_NAME, '', { path: '/', maxAge: 0, secure: useSecureCookie })
 }
 
 export async function readAdminSession(): Promise<AdminSession | null> {
