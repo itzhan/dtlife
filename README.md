@@ -20,6 +20,33 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## 功能概览
+
+- 管理端：`/admin` 登录（ADMIN_USER / ADMIN_PASS），管理套餐、库存（核销码）、登录码
+- 用户端：`/` 输入登录码，跳转到 `/order/[code]` 查看绑定套餐信息
+- 数据库：PostgreSQL，Prisma 模型见 `prisma/schema.prisma`
+- 认证：基于 Cookie 的轻量签名会话（`ADMIN_SESSION_SECRET`）
+
+## Docker 启动
+
+在仓库根目录执行：
+
+```bash
+docker compose up -d --build
+```
+
+默认端口：Web `http://localhost:3100`，Postgres `localhost:5432`。
+
+环境变量（可在 `docker-compose.yml` 覆盖）：
+
+- `ADMIN_USER`（默认 `admin`）
+- `ADMIN_PASS`（默认 `changeme`）
+- `ADMIN_SESSION_SECRET`（默认示例值，请修改为足够随机的字符串）
+
+数据库连接：`DATABASE_URL=postgresql://postgres:postgres@db:5432/dtlife`
+
+容器启动时会执行 `prisma db push` 同步表结构。
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

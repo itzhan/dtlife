@@ -13,20 +13,23 @@ type StoreDetail = {
   store_goods_content: string[][];
 };
 
+type PayStatus = '1' | '2' | '3' | '9'
+type DestroyStatus = 1 | 2
+
 export default function OrderDetailPage() {
-  const paybutton = 2; // 1: 待支付, 2: 已支付, 3: 已取消, 9: 已失效
-  const isDestruction = 1; // 1: 未核销, 2: 已核销
+  const paybutton: PayStatus = '2'; // 1: 待支付, 2: 已支付, 3: 已取消, 9: 已失效
+  const isDestruction: DestroyStatus = 1; // 1: 未核销, 2: 已核销
   const orderCs = "待支付 ";
   const rocallTime = "02:00"; // 示例倒计时
   const spinfo: SpInfo = {
     spimg:
       "https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/ebk-wap/img-20240522093911509-listimg.png",
-    spname: "示例商品名称，支持超长超长超长展示",
+    spname: "蜜雪冰城",
     orginPrice: "99.00",
     nowPrice: "49.90",
   };
-  const cardNum = "8888 6666 2222 0000"; // 示例卡号
-  const goodsCodeType = 2; // 1: 卡密 2: 核销码 3: 领取链接
+  const cardNum = ""; // 默认不显示卡号
+  const goodsCodeType = '2'; // 1: 卡密 2: 核销码 3: 领取链接
   const goodsCode = "6F8A-2K9P-7QW3"; // 展示的核销码/卡密/链接
   const store_source_id = 1; // 5 时显示“请点击去核销”
   const qrcodeSize = 210; // 仅用于占位
@@ -49,6 +52,11 @@ export default function OrderDetailPage() {
       store_goods_name: "B套餐",
       store_goods_content: [["牛排", "沙拉"], ["果汁"]],
     },
+  ];
+  const package_items: { name: string; price: number }[] = [
+    { name: "车厘子小麦（3 斤）", price: 29.7 },
+    { name: "澳洲西冷牛排（2 份）", price: 58.0 },
+    { name: "鲜榨果汁（1 杯）", price: 12.9 },
   ];
 
   const rawWxss = `@charset "UTF-8";
@@ -611,6 +619,33 @@ export default function OrderDetailPage() {
       .fl{ float:left; }
       .fr{ float:right; }
       body{ background:#f5f5f5; }
+      /* 状态栏右侧箭头紧贴文字 */
+      .orderWrapper .orderStatus.data-v-389a9f20{ display:flex; align-items:center; justify-content:flex-start; }
+      .orderWrapper .orderStatus.data-v-389a9f20 img{ margin-left: calc(8 * var(--rpx)); height: calc(20 * var(--rpx)); width: calc(10 * var(--rpx)); }
+      /* 使用提示一行小字（更小3倍），容器更低 */
+      .tishi.data-v-389a9f20{ white-space:nowrap; overflow:hidden; display:flex; align-items:center; height: calc(36 * var(--rpx)); }
+      .tishi.data-v-389a9f20 span{ font-size: calc(8 * var(--rpx)); line-height: calc(36 * var(--rpx)); }
+      /* 使用方法详见：图标与文字同一行 */
+      .useTips.data-v-389a9f20{ display:flex; align-items:center; gap: calc(8 * var(--rpx)); }
+      .useTips .useType.data-v-389a9f20{ display:flex; align-items:center; gap: calc(8 * var(--rpx)); }
+      .useTips .useType .link.data-v-389a9f20{ margin-left: 0; }
+      /* 订单信息每行排版（值紧挨标题，复制在最右） */
+      .orderInfo .listCon .line.data-v-389a9f20{ display:flex; align-items:center; height: calc(56 * var(--rpx)); line-height: calc(56 * var(--rpx)); }
+      .orderInfo .listCon .line .infoTitle.data-v-389a9f20{ float:none; margin-right: calc(8 * var(--rpx)); }
+      .orderInfo .listCon .line .infoIntro.data-v-389a9f20{ float:none; text-align:left; }
+      .orderInfo .listCon .line .copy.data-v-389a9f20{ margin-left:auto; }
+      /* 适用门店右侧“xx家店适用+箭头”一行显示 */
+      .rules .ruleList .useStore.data-v-389a9f20{ white-space:nowrap; display:inline-flex; align-items:center; }
+      .rules .ruleList .useStore.data-v-389a9f20 img{ margin-left: calc(12 * var(--rpx)); height: calc(20 * var(--rpx)); width: calc(12 * var(--rpx)); }
+      .rules .titleContent .storeName.data-v-389a9f20, .rules .titleContent .storeAddress.data-v-389a9f20{ display:block; }
+      /* 适用门店右侧电话按钮更小更贴近 */
+      .call-phone-wrap.data-v-389a9f20{ display:flex; align-items:center; gap: calc(8 * var(--rpx)); }
+      .call-phone-btn.data-v-389a9f20{ color:#E86E0F; font-size: calc(20 * var(--rpx)); height: calc(30 * var(--rpx)); line-height: calc(30 * var(--rpx)); padding: 0 calc(12 * var(--rpx)); background:#FFFEFC; border: 1px solid #FFD7A8; border-radius: calc(20 * var(--rpx)); text-align:center; }
+      .call-phone-icon.data-v-389a9f20{ width: calc(32 * var(--rpx)); height: calc(32 * var(--rpx)); }
+      /* 套餐信息条目左右布局 */
+      .pkgList.data-v-389a9f20{ padding-top: calc(16 * var(--rpx)); }
+      .pkgItem.data-v-389a9f20{ display:flex; align-items:center; justify-content:space-between; height: calc(52 * var(--rpx)); line-height: calc(52 * var(--rpx)); font-size: calc(28 * var(--rpx)); }
+      .pkgItem .price.data-v-389a9f20{ color:#202020; }
     `;
     return helpers + "\n" + css;
   }, [rawWxss]);
@@ -618,41 +653,41 @@ export default function OrderDetailPage() {
   return (
     <div className="orderdtail data-v-389a9f20">
       <div className="orderWrapper data-v-389a9f20">
-        {paybutton === 1 ? (
+        {paybutton === '1' ? (
           <div className="orderStatus data-v-389a9f20">
             {orderCs}
             <span className="data-v-389a9f20">{rocallTime}</span>
           </div>
-        ) : paybutton === 2 && isDestruction === 1 ? (
+        ) : paybutton === '2' && isDestruction === 1 ? (
           <div className="orderStatus data-v-389a9f20">
-            订单已支付
+            <span>订单已支付</span>
             <img
               className="data-v-389a9f20"
               src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/mini-wx/images/common/arr1.png"
               alt="arrow"
             />
           </div>
-        ) : paybutton === 3 ? (
+        ) : paybutton === '3' ? (
           <div className="orderStatus data-v-389a9f20">
-            订单已取消
+            <span>订单已取消</span>
             <img
               className="data-v-389a9f20"
               src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/mini-wx/images/common/arr1.png"
               alt="arrow"
             />
           </div>
-        ) : paybutton === 2 && isDestruction === 2 ? (
+        ) : paybutton === '2' && isDestruction === 2 ? (
           <div className="orderStatus data-v-389a9f20">
-            订单已核销
+            <span>订单已核销</span>
             <img
               className="data-v-389a9f20"
               src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/mini-wx/images/common/arr1.png"
               alt="arrow"
             />
           </div>
-        ) : paybutton === 9 ? (
+        ) : paybutton === '9' ? (
           <div className="orderStatus data-v-389a9f20">
-            订单已失效
+            <span>订单已失效</span>
             <img
               className="data-v-389a9f20"
               src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/mini-wx/images/common/arr1.png"
@@ -661,7 +696,7 @@ export default function OrderDetailPage() {
           </div>
         ) : null}
 
-        {paybutton === 1 && (
+        {paybutton === '1' && (
           <div className="nopayTips data-v-389a9f20">
             <img
               className="data-v-389a9f20"
@@ -693,7 +728,7 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="hexiaoList data-v-389a9f20">
-          {paybutton === 2 && isDestruction === 1 && (
+          {paybutton === '2' && isDestruction === 1 && (
             <div className="codetype data-v-389a9f20">
               <div className="listCon data-v-389a9f20" style={{ paddingTop: 30 }}>
                 {cardNum && (
@@ -711,33 +746,34 @@ export default function OrderDetailPage() {
                 <div
                   className="tishi data-v-389a9f20"
                   style={{
-                    height: 60,
+                    height: "calc(36 * var(--rpx))",
                     display: "flex",
+                    alignItems: "center",
                     background: "#FDEDED",
-                    borderRadius: 20,
+                    borderRadius: "calc(12 * var(--rpx))",
                     width: "90%",
                     margin: "0 auto",
-                    paddingLeft: 20,
+                    paddingLeft: "calc(12 * var(--rpx))",
                   }}
                 >
                   <img
                     className="data-v-389a9f20"
                     src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/mini-wx/images/bargain/listen.png"
                     alt="sound"
-                    style={{ width: 36, height: 36, marginTop: 13, marginRight: 4 }}
+                    style={{ width: "calc(24 * var(--rpx))", height: "calc(24 * var(--rpx))", marginRight: "calc(6 * var(--rpx))" }}
                   />
                   <span
                     className="data-v-389a9f20"
-                    style={{ color: "#D35A5E", fontSize: 22, lineHeight: 2.2 as any }}
+                    style={{ color: "#D35A5E" }}
                   >
-                    请提醒商家使用【DT生活核销小程序】验券核销
+                    请提醒商家使用核销小程序验券核销
                   </span>
                 </div>
 
                 <div className="ercodetitle clearfix data-v-389a9f20">
-                  {goodsCodeType === 1 ? (
+                  {goodsCodeType === '1' ? (
                     <span className="hexiao fl data-v-389a9f20">卡密：</span>
-                  ) : goodsCodeType === 2 ? (
+                  ) : goodsCodeType === '2' ? (
                     <span className="hexiao fl data-v-389a9f20">核销码：</span>
                   ) : (
                     <span className="hexiao fl data-v-389a9f20">领取链接：</span>
@@ -746,16 +782,18 @@ export default function OrderDetailPage() {
 
                 <div className="popContent data-v-389a9f20" style={{ display: "flex", justifyContent: "center" }}>
                   <div className="canvas data-v-389a9f20">
-                    <div
+                    <img
                       className="data-v-389a9f20"
-                      style={{ width: qrcodeSize, height: qrcodeSize, background: "#f5f5f5", borderRadius: 8 }}
+                      alt="qrcode"
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=${qrcodeSize}x${qrcodeSize}&data=${encodeURIComponent(goodsCode)}`}
+                      style={{ width: qrcodeSize, height: qrcodeSize, borderRadius: 8 }}
                     />
                   </div>
                 </div>
 
                 {store_source_id !== 5 ? (
                   <div className="ercode clearfix last data-v-389a9f20" style={{ marginTop: 40 }}>
-                    {goodsCodeType === 3 ? (
+                    {goodsCodeType === '3' ? (
                       <a className="ercodeNum fl link data-v-389a9f20" href={goodsCode}>
                         {goodsCode}
                       </a>
@@ -775,21 +813,17 @@ export default function OrderDetailPage() {
           )}
         </div>
 
-        {paybutton === 2 && isDestruction === 1 ? (
+        {paybutton === '2' && isDestruction === 1 ? (
           <div className="useTips data-v-389a9f20">
             <img
               className="data-v-389a9f20"
               src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/mini-wx/images/bargain/listen.png"
               alt="listen"
+              style={{ width: 24, height: 24, verticalAlign: "middle" }}
             />
             <div className="useType data-v-389a9f20">
               <span className="fl data-v-389a9f20">使用方法详见</span>
-              <a className="link fl data-v-389a9f20" href="#">商品详情</a>，
-              {useLink && (
-                <span className="useType_url fl data-v-389a9f20">，使用请复制{useLink}</span>
-              )}
-              {useLink && <span className="copy fr data-v-389a9f20">复制</span>}
-              <div className="data-v-389a9f20" style={{ clear: "both" }} />
+              <a className="link fl data-v-389a9f20" href="#">商品详情</a>
             </div>
           </div>
         ) : (
@@ -799,27 +833,27 @@ export default function OrderDetailPage() {
         <div className="orderInfo data-v-389a9f20">
           <div className="title data-v-389a9f20">订单信息</div>
           <div className="listCon data-v-389a9f20">
-            <div className="clearfix data-v-389a9f20">
+            <div className="line data-v-389a9f20">
               <span className="infoTitle data-v-389a9f20">订单号码：</span>
               <span className="infoIntro data-v-389a9f20">{orderNum}</span>
               <span className="copy data-v-389a9f20">复制</span>
             </div>
             {time_valid ? (
-              <div className="clearfix data-v-389a9f20">
+              <div className="line data-v-389a9f20">
                 <span className="infoTitle data-v-389a9f20">有效期至：</span>
                 <span className="infoIntro data-v-389a9f20">{time_valid}</span>
               </div>
             ) : (
               <span className="data-v-389a9f20" />
             )}
-            <div className="clearfix paytime data-v-389a9f20">
+            <div className="line paytime data-v-389a9f20">
               <span className="infoTitle data-v-389a9f20">原       价：</span>
               <span className="infoIntro data-v-389a9f20">¥{spinfo.orginPrice}</span>
             </div>
             {user_points == null ? (
-              <div className="clearfix paytime data-v-389a9f20" />
+              <div className="line paytime data-v-389a9f20" />
             ) : (
-              <div className="data-v-389a9f20">
+              <div className="line data-v-389a9f20">
                 <span className="infoTitle data-v-389a9f20">抵扣积分：</span>
                 <span className="infoIntro data-v-389a9f20">{user_points}</span>
               </div>
@@ -827,7 +861,7 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {paybutton === 2 && isDestruction === 1 && (
+        {paybutton === '2' && isDestruction === 1 && (
           <div className="rules lists data-v-389a9f20">
             <div className="ruleList store data-v-389a9f20">
               <div className="titlename data-v-389a9f20">适用门店</div>
@@ -849,56 +883,26 @@ export default function OrderDetailPage() {
                   <span className="storeAddress data-v-389a9f20">{storeAddress}</span>
                 </a>
               </div>
-              <div className="data-v-389a9f20" style={{ marginLeft: 36, marginTop: 10 }}>
-                <div
-                  className="data-v-389a9f20"
-                  style={{
-                    color: "#E86E0F",
-                    fontSize: 20,
-                    lineHeight: 30,
-                    marginRight: 10,
-                    width: 108,
-                    height: 30,
-                    background: "#FFFEFC",
-                    border: "1px solid #FFD7A8",
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
-                    textAlign: "center",
-                    borderBottomLeftRadius: 20,
-                  }}
-                >
-                  商家电话
-                </div>
+              <div className="call-phone-wrap data-v-389a9f20">
+                <a className="call-phone-btn data-v-389a9f20" href={`tel:${phone}`}>商家电话</a>
                 <img
-                  className="data-v-389a9f20"
+                  className="call-phone-icon data-v-389a9f20"
                   src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/ebk-wap/img-202309060318386529-Group%2034149%403x.png"
                   alt="phone"
-                  style={{ width: 60, height: 60, marginLeft: 80, marginTop: 10 }}
                 />
               </div>
             </div>
           </div>
         )}
 
-        {store_detail_data && (
+        {package_items && (
           <div className="orderInfo data-v-389a9f20" id="section1">
             <div className="title data-v-389a9f20">套餐信息</div>
-            <div className="detail_info data-v-389a9f20">
-              {store_detail_data.map((item, i) => (
-                <div className="data-v-389a9f20" key={i}>
-                  <div className="two_detail data-v-389a9f20">
-                    <span className="lable-point _span data-v-389a9f20" />
-                    {item.store_goods_name}
-                  </div>
-                  {item.store_goods_content.map((store_list, j) => (
-                    <div className="three_detail data-v-389a9f20" key={j}>
-                      {store_list.map((st, k) => (
-                        <div className="data-v-389a9f20" key={k}>
-                          {st}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+            <div className="pkgList data-v-389a9f20">
+              {package_items.map((it, idx) => (
+                <div className="pkgItem data-v-389a9f20" key={idx}>
+                  <div className="name data-v-389a9f20">{it.name}</div>
+                  <div className="price data-v-389a9f20">¥{it.price}</div>
                 </div>
               ))}
             </div>
@@ -906,7 +910,7 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {!false && paybutton === 1 && (
+      {!false && paybutton === '1' && (
         <div className="bottomBtn data-v-389a9f20">
           <div className="content data-v-389a9f20">
             <div className="price data-v-389a9f20">

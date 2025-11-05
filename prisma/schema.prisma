@@ -1,0 +1,44 @@
+// 数据库：PostgreSQL
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Package {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  priceCents  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stocks      Stock[]
+  loginCodes  LoginCode[]
+}
+
+// 库存，每一条代表一个核销码
+model Stock {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  used       Boolean  @default(false)
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+  packageId  String
+  package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+}
+
+// 登录码：用户通过该码进入并查看绑定的套餐
+model LoginCode {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  active     Boolean  @default(true)
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  packageId  String
+  package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+}
+
