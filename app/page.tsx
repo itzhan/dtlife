@@ -13,7 +13,7 @@ export default function Home() {
     const res = await fetch('/api/user/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const data = await res.json().catch(() => ({} as { message?: string }))
     if (!res.ok) return message.error(data.message || '登录码无效')
-    router.push(`/order/${encodeURIComponent(values.code)}`)
+    router.push(`/bargain/order-detail?code=${encodeURIComponent(values.code)}`)
   }
 
   return (

@@ -8,6 +8,7 @@ type CreateLoginCodeBody = {
   packageId?: string
   expiresAt?: string
   active?: boolean
+  orderNumber?: string | null
 }
 
 export async function GET() {
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
     active: body.active ?? true,
   }
   if (body.expiresAt) data.expiresAt = new Date(body.expiresAt)
+  if (body.orderNumber !== undefined) {
+    const orderNumber = String(body.orderNumber ?? '').trim()
+    data.orderNumber = orderNumber.length > 0 ? orderNumber : null
+  }
   try {
     const created = await prisma.loginCode.create({ data })
     return NextResponse.json(created)

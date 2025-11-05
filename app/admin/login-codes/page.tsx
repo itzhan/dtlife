@@ -4,9 +4,9 @@ import { Button, Card, DatePicker, Flex, Form, Input, Select, Table, Tag, messag
 import type { TableProps } from 'antd'
 import dayjs from 'dayjs'
 
-type LoginCode = { id: string; code: string; packageId: string; active: boolean; expiresAt?: string | null; createdAt: string }
+type LoginCode = { id: string; code: string; packageId: string; active: boolean; expiresAt?: string | null; createdAt: string; orderNumber?: string | null }
 type Package = { id: string; name: string }
-type CreateFormValues = { code: string; packageId: string; active?: boolean; expiresAt?: dayjs.Dayjs }
+type CreateFormValues = { code: string; packageId: string; active?: boolean; expiresAt?: dayjs.Dayjs; orderNumber?: string }
 
 export default function LoginCodesPage() {
   const [list, setList] = useState<LoginCode[]>([])
@@ -36,6 +36,7 @@ export default function LoginCodesPage() {
       active: values.active ?? true,
     }
     if (values.expiresAt) payload.expiresAt = values.expiresAt.toISOString()
+    if (values.orderNumber) payload.orderNumber = values.orderNumber.trim()
     const res = await fetch('/api/login-codes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const data = await res.json().catch(() => ({} as { message?: string }))
     if (!res.ok) return message.error(data.message || '创建失败')
@@ -47,6 +48,7 @@ export default function LoginCodesPage() {
   const columns: TableProps<LoginCode>['columns'] = [
     { title: '登录码', dataIndex: 'code' },
     { title: '套餐ID', dataIndex: 'packageId' },
+    { title: '订单号', dataIndex: 'orderNumber', render: (value: string | null | undefined) => value || '-' },
     { title: '状态', dataIndex: 'active', render: (value: boolean) => value ? <Tag color="green">启用</Tag> : <Tag>停用</Tag> },
     { title: '过期时间', dataIndex: 'expiresAt', render: (value: string | null | undefined) => value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-' },
     { title: '创建时间', dataIndex: 'createdAt', render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm') },
@@ -61,6 +63,9 @@ export default function LoginCodesPage() {
           </Form.Item>
           <Form.Item name="packageId" label="绑定套餐" rules={[{ required: true }]}> 
             <Select style={{ width: 260 }} placeholder="选择套餐" options={pkgs.map(p => ({ label: p.name, value: p.id }))} />
+          </Form.Item>
+          <Form.Item name="orderNumber" label="订单号">
+            <Input placeholder="可选，用于展示订单信息" style={{ width: 220 }} />
           </Form.Item>
           <Form.Item name="expiresAt" label="过期时间">
             <DatePicker showTime />

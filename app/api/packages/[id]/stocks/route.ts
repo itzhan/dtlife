@@ -40,17 +40,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
     )
   )
   if (filtered.length === 0) return NextResponse.json({ message: '无有效核销码' }, { status: 400 })
-  // 使用事务批量插入，忽略重复
+
   const operations = filtered.map((code) =>
     prisma.stock.create({ data: { code, packageId: id } })
   )
-  const created: Array<{ id: string }> = []
+  let created = 0
   for (const op of operations) {
     try {
-      created.push(await op)
+      await op
+      created += 1
     } catch {
       // 唯一键冲突时忽略，让流程继续
     }
   }
-  return NextResponse.json({ ok: true, created: created.length, requested: filtered.length })
+  return NextResponse.json({ ok: true, created, requested: filtered.length })
 }
+

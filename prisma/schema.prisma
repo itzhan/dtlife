@@ -13,6 +13,22 @@ model Package {
   name        String
   description String?
   priceCents  Int      @default(0)
+  originalPriceCents Int      @default(0)
+  coverImageUrl     String?
+  cardNumber        String?
+  goodsCodeType     Int      @default(2)
+  storeSourceId     Int?
+  useLink           String?
+  validUntil        DateTime?
+  userPoints        Int      @default(0)
+  storeId           String?
+  goodsId           String?
+  storeCount        Int      @default(0)
+  primaryStoreName    String?
+  primaryStoreAddress String?
+  primaryStorePhone   String?
+  storeDetails      Json?
+  packageItems      Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -37,8 +53,8 @@ model LoginCode {
   code       String   @unique
   active     Boolean  @default(true)
   expiresAt  DateTime?
+  orderNumber String?
   createdAt  DateTime @default(now())
   packageId  String
   package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
 }
-
