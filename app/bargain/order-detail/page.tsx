@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import "./order-detail.css";
 
@@ -22,6 +22,8 @@ type UserOpenResponse = {
   orderNumber: string | null
   verificationCode: string | null
   unusedStock: number
+  payStatus?: PayStatus
+  destroyStatus?: DestroyStatus
   package: {
     id: string
     name: string
@@ -51,17 +53,18 @@ const formatPrice = (priceCents?: number | null) => {
   return (priceCents / 100).toFixed(2)
 }
 
-const formatValidUntil = (value?: string | null) => {
-  if (!value) return "长期有效"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+const formatValidUntil = () => {
+  const now = new Date()
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000
+  const shanghaiDate = new Date(utcMs + 8 * 60 * 60 * 1000)
+  shanghaiDate.setDate(shanghaiDate.getDate() + 2)
   const pad = (num: number, length = 2) => String(num).padStart(length, "0")
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-  const hours = pad(date.getHours())
-  const minutes = pad(date.getMinutes())
-  const seconds = pad(date.getSeconds())
+  const year = shanghaiDate.getFullYear()
+  const month = pad(shanghaiDate.getMonth() + 1)
+  const day = pad(shanghaiDate.getDate())
+  const hours = pad(shanghaiDate.getHours())
+  const minutes = pad(shanghaiDate.getMinutes())
+  const seconds = pad(shanghaiDate.getSeconds())
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
@@ -70,7 +73,7 @@ const normalizeGoodsCodeType = (value?: number | null): GoodsCodeType => {
   return '2'
 }
 
-export default function OrderDetailPage() {
+function OrderDetailPageInner() {
   const searchParams = useSearchParams();
   const codeFromUrl = searchParams.get("code");
   const [orderDetail, setOrderDetail] = useState<UserOpenResponse | null>(null);
@@ -147,8 +150,8 @@ export default function OrderDetailPage() {
   }
 
   const pkg = orderDetail.package;
-  const paybutton: PayStatus = '2'; // 真实业务可根据订单状态调整
-  const isDestruction: DestroyStatus = 1;
+  const paybutton: PayStatus = orderDetail.payStatus ?? '2'
+  const isDestruction: DestroyStatus = orderDetail.destroyStatus ?? 1
   const orderCs = "待支付 ";
   const rocallTime = "02:00";
 
@@ -169,8 +172,8 @@ export default function OrderDetailPage() {
   const qrcodeSize = 210;
   const useLink = pkg.useLink ?? "";
   const orderNum = orderDetail.orderNumber ?? orderDetail.code;
-  const time_valid = formatValidUntil(pkg.validUntil);
-  const user_points: string | number | null = pkg.userPoints ?? null;
+  const time_valid = formatValidUntil();
+  const user_points: number | null = typeof pkg.userPoints === 'number' && pkg.userPoints > 0 ? pkg.userPoints : null;
   const storeId = pkg.storeId ?? "";
   const goodsId = pkg.goodsId ?? "";
   const useStoreNum = pkg.storeCount ?? pkg.storeDetails?.length ?? 0;
@@ -495,4 +498,12 @@ export default function OrderDetailPage() {
 
     </div>
   );
+}
+
+export default function OrderDetailPage() {
+  return (
+    <Suspense fallback={<div className="order-detail-page" style={{ padding: 24 }}>页面加载中...</div>}>
+      <OrderDetailPageInner />
+    </Suspense>
+  )
 }

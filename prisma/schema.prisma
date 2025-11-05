@@ -45,6 +45,7 @@ model Stock {
   createdAt  DateTime @default(now())
   packageId  String
   package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  loginCodes LoginCode[]
 }
 
 // 登录码：用户通过该码进入并查看绑定的套餐
@@ -57,4 +58,6 @@ model LoginCode {
   createdAt  DateTime @default(now())
   packageId  String
   package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  stockId    String?   @unique
+  stock      Stock?    @relation(fields: [stockId], references: [id])
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { readAdminSession } from '@/lib/auth'
 
@@ -156,14 +156,15 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   if (body.primaryStorePhone !== undefined) data.primaryStorePhone = parseString(body.primaryStorePhone)
   if (body.storeDetails !== undefined) {
     const normalized = normalizeStoreDetails(body.storeDetails)
-    data.storeDetails = normalized
+    data.storeDetails = normalized ?? Prisma.JsonNull
     // 如果前端未明确传 storeCount，则同步调整
     if (body.storeCount === undefined && normalized && Array.isArray(normalized)) {
       data.storeCount = normalized.length
     }
   }
   if (body.packageItems !== undefined) {
-    data.packageItems = normalizePackageItems(body.packageItems)
+    const normalizedItems = normalizePackageItems(body.packageItems)
+    data.packageItems = normalizedItems ?? Prisma.JsonNull
   }
   const updated = await prisma.package.update({ where: { id }, data })
   return NextResponse.json(updated)

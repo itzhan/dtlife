@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { readAdminSession } from '@/lib/auth'
 
@@ -152,8 +152,8 @@ export async function POST(req: NextRequest) {
       primaryStoreName: parseString(body.primaryStoreName),
       primaryStoreAddress: parseString(body.primaryStoreAddress),
       primaryStorePhone: parseString(body.primaryStorePhone),
-      storeDetails,
-      packageItems,
+      storeDetails: storeDetails ?? Prisma.JsonNull,
+      packageItems: packageItems ?? Prisma.JsonNull,
     } satisfies Prisma.PackageCreateInput,
   })
   return NextResponse.json(created)

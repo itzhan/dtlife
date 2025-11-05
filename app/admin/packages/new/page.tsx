@@ -1,25 +1,15 @@
 "use client"
-import { Button, Card, DatePicker, Divider, Flex, Form, Input, InputNumber, Space, Typography, message } from 'antd'
+import { Button, Card, Divider, Flex, Form, Input, InputNumber, Space, Typography, message } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
-import type { Dayjs } from 'dayjs'
 
 type StoreDetailFormValue = { name?: string; items?: { value?: string }[] }
 type PackageItemFormValue = { name?: string; priceYuan?: number; items?: { value?: string }[] }
 type NewPackageFormValues = {
   name: string
-  description?: string
   priceYuan?: number
   originalPriceYuan?: number
   coverImageUrl?: string
-  cardNumber?: string
-  goodsCodeType?: number
-  storeSourceId?: number
-  useLink?: string
-  validUntil?: Dayjs
-  userPoints?: number
-  storeId?: string
-  goodsId?: string
   storeCount?: number
   primaryStoreName?: string
   primaryStoreAddress?: string
@@ -35,18 +25,18 @@ export default function NewPackagePage() {
   const onFinish = async (values: NewPackageFormValues) => {
     const body = {
       name: values.name,
-      description: values.description || null,
+      description: '',
       priceYuan: values.priceYuan ?? 0,
       originalPriceYuan: values.originalPriceYuan ?? 0,
-      coverImageUrl: values.coverImageUrl || null,
-      cardNumber: values.cardNumber || null,
-      goodsCodeType: values.goodsCodeType ?? 2,
-      storeSourceId: values.storeSourceId ?? null,
-      useLink: values.useLink || null,
-      validUntil: values.validUntil ? values.validUntil.toISOString() : null,
-      userPoints: values.userPoints ?? 0,
-      storeId: values.storeId || null,
-      goodsId: values.goodsId || null,
+      coverImageUrl: (values.coverImageUrl || '').trim() || null,
+      cardNumber: null,
+      goodsCodeType: 2,
+      storeSourceId: null,
+      useLink: null,
+      validUntil: null,
+      userPoints: 0,
+      storeId: null,
+      goodsId: null,
       storeCount: values.storeCount ?? undefined,
       primaryStoreName: values.primaryStoreName || null,
       primaryStoreAddress: values.primaryStoreAddress || null,
@@ -83,12 +73,9 @@ export default function NewPackagePage() {
   return (
     <Flex justify="center" style={{ padding: 16 }}>
       <Card title="新建套餐" style={{ width: 900 }}>
-        <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ goodsCodeType: 2, priceYuan: 0, originalPriceYuan: 0, userPoints: 0 }}>
-          <Form.Item name="name" label="商品标题" rules={[{ required: true, message: '请输入商品标题' }]}>
+        <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ priceYuan: 0, originalPriceYuan: 0 }}>
+          <Form.Item name="name" label="商品标题" rules={[{ required: true, message: '请输入商品标题' }]}> 
             <Input placeholder="请输入商品标题" />
-          </Form.Item>
-          <Form.Item name="description" label="套餐描述">
-            <Input.TextArea rows={4} placeholder="请输入套餐描述，可留空" />
           </Form.Item>
           <Form.Item name="coverImageUrl" label="封面图地址">
             <Input placeholder="https://example.com/cover.jpg" />
@@ -98,30 +85,6 @@ export default function NewPackagePage() {
           </Form.Item>
           <Form.Item name="originalPriceYuan" label="原价(元)">
             <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="cardNumber" label="卡号（可选）">
-            <Input placeholder="展示在订单详情中的卡号" />
-          </Form.Item>
-          <Form.Item name="goodsCodeType" label="核销码类型">
-            <InputNumber min={1} max={3} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="storeSourceId" label="门店来源ID（可选）">
-            <InputNumber style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="useLink" label="使用说明链接">
-            <Input placeholder="https://example.com/how-to-use" />
-          </Form.Item>
-          <Form.Item name="validUntil" label="有效期至">
-            <DatePicker showTime style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="userPoints" label="抵扣积分">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="storeId" label="门店ID（跳转使用）">
-            <Input placeholder="storeId" />
-          </Form.Item>
-          <Form.Item name="goodsId" label="商品ID（跳转使用）">
-            <Input placeholder="goodsId" />
           </Form.Item>
           <Form.Item name="storeCount" label="适用门店数量" tooltip="留空将根据下方门店列表自动计算">
             <InputNumber min={0} style={{ width: '100%' }} />
@@ -153,12 +116,7 @@ export default function NewPackagePage() {
                       </Space>
                     }
                   >
-                    <Form.Item
-                      label="名称"
-                      name={[field.name, 'name']}
-                      fieldKey={[field.fieldKey, 'name']}
-                      rules={[{ required: true, message: '请输入套餐名称' }]}
-                    >
+                    <Form.Item label="名称" name={[field.name, 'name']} rules={[{ required: true, message: '请输入套餐名称' }]}>
                       <Input placeholder="例如：A套餐" />
                     </Form.Item>
                     <Typography.Text strong>套餐明细</Typography.Text>
@@ -169,7 +127,6 @@ export default function NewPackagePage() {
                             <Flex key={itemField.key} align="center" gap={8}>
                               <Form.Item
                                 name={[itemField.name, 'value']}
-                                fieldKey={[itemField.fieldKey, 'value']}
                                 rules={[{ required: true, message: '请输入明细内容' }]}
                                 style={{ flex: 1, marginBottom: 0 }}
                               >
@@ -217,19 +174,10 @@ export default function NewPackagePage() {
                       </Space>
                     }
                   >
-                    <Form.Item
-                      label="名称"
-                      name={[field.name, 'name']}
-                      fieldKey={[field.fieldKey, 'name']}
-                      rules={[{ required: true, message: '请输入名称' }]}
-                    >
+                    <Form.Item label="名称" name={[field.name, 'name']} rules={[{ required: true, message: '请输入名称' }]}>
                       <Input placeholder="例如：牛排豪华套餐" />
                     </Form.Item>
-                    <Form.Item
-                      label="价格(元)"
-                      name={[field.name, 'priceYuan']}
-                      fieldKey={[field.fieldKey, 'priceYuan']}
-                    >
+                    <Form.Item label="价格(元)" name={[field.name, 'priceYuan']}>
                       <InputNumber min={0} style={{ width: '100%' }} />
                     </Form.Item>
                     <Typography.Text strong>包含内容</Typography.Text>
@@ -240,7 +188,6 @@ export default function NewPackagePage() {
                             <Flex key={itemField.key} gap={8} align="center">
                               <Form.Item
                                 name={[itemField.name, 'value']}
-                                fieldKey={[itemField.fieldKey, 'value']}
                                 rules={[{ required: true, message: '请输入内容' }]}
                                 style={{ flex: 1, marginBottom: 0 }}
                               >

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Button,
   Card,
-  DatePicker,
   Descriptions,
   Divider,
   Flex,
@@ -12,6 +11,7 @@ import {
   Input,
   InputNumber,
   List,
+  Popconfirm,
   Space,
   Table,
   Tag,
@@ -54,18 +54,9 @@ type StoreDetailFormRow = { name?: string; items?: { value?: string }[] }
 type PackageItemFormRow = { name?: string; priceYuan?: number; items?: { value?: string }[] }
 type UpdateFormValues = {
   name: string
-  description?: string
   priceYuan?: number
   originalPriceYuan?: number
   coverImageUrl?: string
-  cardNumber?: string
-  goodsCodeType?: number
-  storeSourceId?: number | null
-  useLink?: string
-  validUntil?: dayjs.Dayjs | null
-  userPoints?: number
-  storeId?: string
-  goodsId?: string
   storeCount?: number
   primaryStoreName?: string
   primaryStoreAddress?: string
@@ -81,6 +72,7 @@ export default function PackageDetailPage() {
   const [pkg, setPkg] = useState<Pkg | null>(null)
   const [stocks, setStocks] = useState<Stock[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingStockId, setDeletingStockId] = useState<string | null>(null)
   const [editForm] = Form.useForm<UpdateFormValues>()
   const [stockForm] = Form.useForm<StockFormValues>()
 
@@ -95,18 +87,9 @@ export default function PackageDetailPage() {
           setPkg(pkgData)
           editForm.setFieldsValue({
             name: pkgData.name,
-            description: pkgData.description ?? '',
             priceYuan: pkgData.priceCents / 100,
             originalPriceYuan: pkgData.originalPriceCents / 100,
             coverImageUrl: pkgData.coverImageUrl ?? '',
-            cardNumber: pkgData.cardNumber ?? '',
-            goodsCodeType: pkgData.goodsCodeType,
-            storeSourceId: pkgData.storeSourceId ?? undefined,
-            useLink: pkgData.useLink ?? '',
-            validUntil: pkgData.validUntil ? dayjs(pkgData.validUntil) : null,
-            userPoints: pkgData.userPoints,
-            storeId: pkgData.storeId ?? '',
-            goodsId: pkgData.goodsId ?? '',
             storeCount: pkgData.storeCount,
             primaryStoreName: pkgData.primaryStoreName ?? '',
             primaryStoreAddress: pkgData.primaryStoreAddress ?? '',
@@ -140,18 +123,18 @@ export default function PackageDetailPage() {
   const onUpdate = async (values: UpdateFormValues) => {
     const payload: Record<string, unknown> = {}
     payload.name = values.name
-    payload.description = values.description ?? ''
+    payload.description = pkg?.description ?? ''
     payload.priceYuan = Number(values.priceYuan ?? 0)
     payload.originalPriceYuan = Number(values.originalPriceYuan ?? 0)
-    payload.coverImageUrl = values.coverImageUrl ?? null
-    payload.cardNumber = values.cardNumber ?? null
-    payload.goodsCodeType = values.goodsCodeType ?? 2
-    payload.storeSourceId = values.storeSourceId ?? null
-    payload.useLink = values.useLink ?? null
-    payload.validUntil = values.validUntil ? values.validUntil.toISOString() : null
-    payload.userPoints = Number(values.userPoints ?? 0)
-    payload.storeId = values.storeId ?? null
-    payload.goodsId = values.goodsId ?? null
+    payload.coverImageUrl = (values.coverImageUrl ?? '').trim() || null
+    payload.cardNumber = pkg?.cardNumber ?? null
+    payload.goodsCodeType = 2
+    payload.storeSourceId = pkg?.storeSourceId ?? null
+    payload.useLink = pkg?.useLink ?? null
+    payload.validUntil = null
+    payload.userPoints = pkg?.userPoints ?? 0
+    payload.storeId = pkg?.storeId ?? null
+    payload.goodsId = pkg?.goodsId ?? null
     payload.storeCount = values.storeCount
     payload.primaryStoreName = values.primaryStoreName ?? null
     payload.primaryStoreAddress = values.primaryStoreAddress ?? null
@@ -203,6 +186,23 @@ export default function PackageDetailPage() {
     message.success(`请求 ${requested} 条，新增成功 ${createdCount} 条`)
     stockForm.resetFields(['codes'])
     void load()
+  }
+
+  const onDeleteStock = async (stockId: string) => {
+    if (!id) return
+    setDeletingStockId(stockId)
+    try {
+      const res = await fetch(`/api/packages/${id}/stocks?stockId=${stockId}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({} as { message?: string }))
+      if (!res.ok) return message.error(data.message || '删除失败')
+      message.success('删除成功')
+      setStocks((prev) => prev.filter((stock) => stock.id !== stockId))
+    } catch (error) {
+      console.error(error)
+      message.error('删除失败')
+    } finally {
+      setDeletingStockId(null)
+    }
   }
 
   const storeDetailColumns: TableProps<StoreDetail>['columns'] = [
@@ -295,9 +295,6 @@ export default function PackageDetailPage() {
           <Form.Item name="name" label="商品标题" rules={[{ required: true, message: '请输入商品标题' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} />
-          </Form.Item>
           <Form.Item name="coverImageUrl" label="封面图地址">
             <Input placeholder="https://example.com/cover.jpg" />
           </Form.Item>
@@ -306,30 +303,6 @@ export default function PackageDetailPage() {
           </Form.Item>
           <Form.Item name="originalPriceYuan" label="原价(元)">
             <InputNumber min={0} style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="cardNumber" label="卡号">
-            <Input placeholder="展示在订单详情中的卡号" />
-          </Form.Item>
-          <Form.Item name="goodsCodeType" label="核销码类型">
-            <InputNumber min={1} max={3} style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="storeSourceId" label="门店来源ID">
-            <InputNumber style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="useLink" label="使用说明链接">
-            <Input placeholder="https://example.com/how-to-use" />
-          </Form.Item>
-          <Form.Item name="validUntil" label="有效期至">
-            <DatePicker showTime style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="userPoints" label="抵扣积分">
-            <InputNumber min={0} style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="storeId" label="门店ID">
-            <Input placeholder="storeId" />
-          </Form.Item>
-          <Form.Item name="goodsId" label="商品ID">
-            <Input placeholder="goodsId" />
           </Form.Item>
           <Form.Item name="storeCount" label="适用门店数量" tooltip="留空时将根据明细自动计算">
             <InputNumber min={0} style={{ width: 200 }} />
@@ -361,12 +334,7 @@ export default function PackageDetailPage() {
                       </Space>
                     }
                   >
-                    <Form.Item
-                      label="名称"
-                      name={[field.name, 'name']}
-                      fieldKey={[field.fieldKey, 'name']}
-                      rules={[{ required: true, message: '请输入套餐名称' }]}
-                    >
+                    <Form.Item label="名称" name={[field.name, 'name']} rules={[{ required: true, message: '请输入套餐名称' }]}>
                       <Input placeholder="例如：A套餐" />
                     </Form.Item>
                     <Typography.Text strong>套餐明细</Typography.Text>
@@ -377,7 +345,6 @@ export default function PackageDetailPage() {
                             <Flex key={itemField.key} align="center" gap={8}>
                               <Form.Item
                                 name={[itemField.name, 'value']}
-                                fieldKey={[itemField.fieldKey, 'value']}
                                 rules={[{ required: true, message: '请输入套餐明细' }]}
                                 style={{ flex: 1, marginBottom: 0 }}
                               >
@@ -420,18 +387,12 @@ export default function PackageDetailPage() {
                       </Space>
                     }
                   >
-                    <Form.Item
-                      label="名称"
-                      name={[field.name, 'name']}
-                      fieldKey={[field.fieldKey, 'name']}
-                      rules={[{ required: true, message: '请输入名称' }]}
-                    >
+                    <Form.Item label="名称" name={[field.name, 'name']} rules={[{ required: true, message: '请输入名称' }]}>
                       <Input placeholder="例如：牛排豪华套餐" />
                     </Form.Item>
                     <Form.Item
                       label="价格(元)"
                       name={[field.name, 'priceYuan']}
-                      fieldKey={[field.fieldKey, 'priceYuan']}
                     >
                       <InputNumber min={0} style={{ width: '100%' }} />
                     </Form.Item>
@@ -443,7 +404,6 @@ export default function PackageDetailPage() {
                             <Flex key={itemField.key} gap={8} align="center">
                               <Form.Item
                                 name={[itemField.name, 'value']}
-                                fieldKey={[itemField.fieldKey, 'value']}
                                 rules={[{ required: true, message: '请输入内容' }]}
                                 style={{ flex: 1, marginBottom: 0 }}
                               >
@@ -525,6 +485,11 @@ export default function PackageDetailPage() {
                 <Space>
                   <Tag color={it.used ? 'default' : 'green'}>{it.used ? '已核销' : '未核销'}</Tag>
                   <Typography.Text type="secondary">{new Date(it.createdAt).toLocaleString()}</Typography.Text>
+                  <Popconfirm title="确认删除该核销码？" okText="删除" cancelText="取消" onConfirm={() => onDeleteStock(it.id)}>
+                    <Button type="link" danger loading={deletingStockId === it.id}>
+                      删除
+                    </Button>
+                  </Popconfirm>
                 </Space>
               </Space>
             </List.Item>

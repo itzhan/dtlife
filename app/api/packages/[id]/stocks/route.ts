@@ -56,3 +56,17 @@ export async function POST(req: NextRequest, context: RouteContext) {
   return NextResponse.json({ ok: true, created, requested: filtered.length })
 }
 
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const { id } = await extractParams(context)
+  if (!id) return NextResponse.json({ message: '参数错误' }, { status: 400 })
+  const s = await readAdminSession()
+  if (!s) return NextResponse.json({ message: '未认证' }, { status: 401 })
+
+  const stockId = req.nextUrl.searchParams.get('stockId') || ((await req.json().catch(() => null)) as { stockId?: string } | null)?.stockId
+  if (!stockId) return NextResponse.json({ message: '缺少 stockId' }, { status: 400 })
+
+  const result = await prisma.stock.deleteMany({ where: { id: stockId, packageId: id } })
+  if (result.count === 0) return NextResponse.json({ message: '库存不存在或已删除' }, { status: 404 })
+
+  return NextResponse.json({ ok: true, deleted: result.count })
+}

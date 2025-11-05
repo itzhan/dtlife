@@ -53,20 +53,30 @@ export async function POST(req: NextRequest) {
   const { code } = await req.json().catch(() => ({}))
   if (!code) return NextResponse.json({ message: '登录码必填' }, { status: 400 })
   const now = new Date()
-  const c = await prisma.loginCode.findUnique({ where: { code: String(code).trim() } })
+  const c = await prisma.loginCode.findUnique({ where: { code: String(code).trim() }, include: { stock: true } })
   if (!c || !c.active || (c.expiresAt && c.expiresAt < now)) {
     return NextResponse.json({ message: '登录码无效或已过期' }, { status: 404 })
   }
   const pkg = await prisma.package.findUnique({ where: { id: c.packageId } })
   if (!pkg) return NextResponse.json({ message: '套餐不存在' }, { status: 404 })
   const unused = await prisma.stock.count({ where: { packageId: pkg.id, used: false } })
-  const availableStock = await prisma.stock.findFirst({
-    where: { packageId: pkg.id, used: false },
-    orderBy: { createdAt: 'asc' },
-  })
-  const firstStock =
-    availableStock ??
-    (await prisma.stock.findFirst({ where: { packageId: pkg.id }, orderBy: { createdAt: 'asc' } }))
+  let boundStock = c.stock
+  if (!boundStock) {
+    boundStock = await prisma.$transaction(async (tx) => {
+      const available = await tx.stock.findFirst({
+        where: {
+          packageId: pkg.id,
+          used: false,
+          loginCodes: { none: {} },
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (!available) return null
+      await tx.loginCode.update({ where: { id: c.id }, data: { stockId: available.id } })
+      return available
+    }).catch(() => null)
+  }
+  const fallbackStock = boundStock ?? (await prisma.stock.findFirst({ where: { packageId: pkg.id }, orderBy: { createdAt: 'asc' } }))
   const storeDetails = parseStoreDetails(pkg.storeDetails)
   const packageItems = parsePackageItems(pkg.packageItems)
   const storeCount = pkg.storeCount > 0 ? pkg.storeCount : storeDetails.length
@@ -96,6 +106,6 @@ export async function POST(req: NextRequest) {
       packageItems,
     },
     unusedStock: unused,
-    verificationCode: firstStock?.code ?? null,
+    verificationCode: fallbackStock?.code ?? null,
   })
 }
