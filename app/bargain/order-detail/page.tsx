@@ -1,6 +1,7 @@
 "use client";
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { message } from "antd";
 import "./order-detail.css";
 
 type SpInfo = {
@@ -58,14 +59,12 @@ const formatValidUntil = () => {
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000
   const shanghaiDate = new Date(utcMs + 8 * 60 * 60 * 1000)
   shanghaiDate.setDate(shanghaiDate.getDate() + 2)
+  shanghaiDate.setHours(23, 59, 59, 0)
   const pad = (num: number, length = 2) => String(num).padStart(length, "0")
   const year = shanghaiDate.getFullYear()
   const month = pad(shanghaiDate.getMonth() + 1)
   const day = pad(shanghaiDate.getDate())
-  const hours = pad(shanghaiDate.getHours())
-  const minutes = pad(shanghaiDate.getMinutes())
-  const seconds = pad(shanghaiDate.getSeconds())
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  return `${year}-${month}-${day} 23:59:59`
 }
 
 const normalizeGoodsCodeType = (value?: number | null): GoodsCodeType => {
@@ -80,6 +79,42 @@ function OrderDetailPageInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const infoSectionRef = useRef<HTMLDivElement | null>(null);
+  const copyToastTimer = useRef<NodeJS.Timeout | null>(null);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+
+  const handleCopy = useCallback(async (text?: string | null, successText = "复制成功") => {
+    if (!text) {
+      message.warning("没有可复制的内容");
+      return;
+    }
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopyToast(successText);
+      if (copyToastTimer.current) clearTimeout(copyToastTimer.current);
+      copyToastTimer.current = setTimeout(() => setCopyToast(null), 1500);
+    } catch (err) {
+      console.error(err);
+      message.error("复制失败，请稍后重试");
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyToastTimer.current) clearTimeout(copyToastTimer.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!codeFromUrl) {
@@ -187,6 +222,7 @@ function OrderDetailPageInner() {
           price: Number(((item.priceCents ?? 0) / 100).toFixed(2)),
         }))
       : [];
+
   const scrollToInfoSection = () => {
     if (infoSectionRef.current) {
       infoSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -311,7 +347,15 @@ function OrderDetailPageInner() {
                 {cardNum && (
                   <div className="verification-card__row u-clearfix">
                     <span className="verification-card__code u-float-left">{cardNum}</span>
-                    <span className="action-copy u-float-right">复制</span>
+                    <span
+                      className="action-copy u-float-right"
+                      role="button"
+                      tabIndex={0}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handleCopy(cardNum)}
+                    >
+                      复制
+                    </span>
                   </div>
                 )}
 
@@ -372,7 +416,15 @@ function OrderDetailPageInner() {
                     ) : (
                       <span className="verification-card__code u-float-left">{goodsCode}</span>
                     )}
-                    <span className="action-copy u-float-right">复制</span>
+                    <span
+                      className="action-copy u-float-right"
+                      role="button"
+                      tabIndex={0}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handleCopy(goodsCode)}
+                    >
+                      复制
+                    </span>
                   </div>
                 ) : (
                   <div className="verification-card__row u-clearfix is-last" style={{ marginTop: 40 }}>
@@ -408,7 +460,15 @@ function OrderDetailPageInner() {
             <div className="info-row">
               <span className="info-row__label">订单号码：</span>
               <span className="info-row__value">{orderNum}</span>
-              <span className="action-copy">复制</span>
+              <span
+                className="action-copy"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+                onClick={() => handleCopy(orderNum)}
+              >
+                复制
+              </span>
             </div>
             {time_valid ? (
               <div className="info-row">
@@ -445,7 +505,19 @@ function OrderDetailPageInner() {
                 />
               </div>
             </div>
-            <div className="data-v-389a9f20" style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+            <div
+              className="data-v-389a9f20"
+              style={{ display: "flex", justifyContent: "space-between", marginTop: 16, cursor: phone ? "pointer" : "default" }}
+              role="button"
+              tabIndex={0}
+              onClick={() => handleCopy(phone, "门店电话已复制")}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && phone) {
+                  e.preventDefault()
+                  handleCopy(phone, "门店电话已复制")
+                }
+              }}
+            >
               <div className="store-card__content">
                 <div className="store-card__link">
                   <span className="store-card__name">{store_name}</span>
@@ -453,7 +525,17 @@ function OrderDetailPageInner() {
                 </div>
               </div>
               <div className="store-card__call">
-                <a className="store-card__call-button" href={`tel:${phone}`}>商家电话</a>
+                <a
+                  className="store-card__call-button"
+                  href={`tel:${phone}`}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleCopy(phone, "门店电话已复制")
+                  }}
+                >
+                  商家电话
+                </a>
                 <img
                   className="store-card__call-icon"
                   src="https://ebk-picture.oss-cn-hangzhou.aliyuncs.com/ebk-wap/img-202309060318386529-Group%2034149%403x.png"
@@ -495,7 +577,27 @@ function OrderDetailPageInner() {
           </div>
         </div>
       )}
-
+      {copyToast && (
+        <div
+          className="copy-toast"
+          style={{
+            position: "fixed",
+            left: "50%",
+            top: "40%",
+            transform: "translate(-50%, -50%)",
+            background: "rgba(0,0,0,0.85)",
+            color: "#fff",
+            padding: "12px 28px",
+            borderRadius: 24,
+            zIndex: 9999,
+            fontSize: 16,
+            pointerEvents: "none",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+          }}
+        >
+          {copyToast}
+        </div>
+      )}
     </div>
   );
 }
