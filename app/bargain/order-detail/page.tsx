@@ -215,11 +215,11 @@ function OrderDetailPageInner() {
   const store_name = pkg.primaryStoreName ?? "指定门店";
   const storeAddress = pkg.primaryStoreAddress ?? "门店地址待完善";
   const phone = pkg.primaryStorePhone ?? "";
-  const package_items: { name: string; price: number }[] =
+  const package_items: { name: string; price: number | null }[] =
     pkg.packageItems?.length
       ? pkg.packageItems.map((item) => ({
           name: item.name,
-          price: Number(((item.priceCents ?? 0) / 100).toFixed(2)),
+          price: item.priceCents != null ? Number(((item.priceCents ?? 0) / 100).toFixed(2)) : null,
         }))
       : [];
 
@@ -546,14 +546,16 @@ function OrderDetailPageInner() {
           </div>
         )}
 
-        {package_items && (
+        {package_items && package_items.length > 0 && (
           <div className="info-card" id="section1" ref={infoSectionRef}>
             <div className="section-title">套餐信息</div>
             <div className="package-list">
               {package_items.map((it, idx) => (
                 <div className="package-list__item" key={idx}>
                   <div className="package-list__name">{it.name}</div>
-                  <div className="price-amount">¥{it.price}</div>
+                  {it.price && it.price > 0 ? (
+                    <div className="price-amount">¥{it.price}</div>
+                  ) : null}
                 </div>
               ))}
             </div>
