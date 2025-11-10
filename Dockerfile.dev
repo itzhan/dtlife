@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1.7
+FROM node:20-alpine
+
+WORKDIR /app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN apk add --no-cache libc6-compat openssl \
+  && corepack enable
+
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+RUN pnpm install && pnpm prisma:generate
+
+# 0.0.0.0 便于宿主访问，端口映射由 docker-compose 控制
+EXPOSE 3000
+CMD ["sh", "-c", "pnpm prisma:generate && pnpm dev --hostname 0.0.0.0"]

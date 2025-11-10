@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 type StoreDetailInput = { name?: unknown; items?: unknown }
-type PackageItemInput = { name?: unknown; priceCents?: unknown; priceYuan?: unknown; items?: unknown }
+type PackageItemInput = { name?: unknown; priceCents?: unknown; priceYuan?: unknown }
 
 function parseString(value: unknown): string | null {
   if (typeof value === 'string') {
@@ -62,14 +62,10 @@ function normalizePackageItems(input: unknown): Prisma.JsonValue | null {
           ? Math.round(Number(payload.priceYuan) * 100)
           : null)
       if (!name) return null
-      const items = Array.isArray(payload.items)
-        ? payload.items
-            .map((item) => parseString(item))
-            .filter((item): item is string => Boolean(item))
-        : []
-      return { name, priceCents: Math.max(0, price ?? 0), items }
+      const priceCents = price != null ? Math.max(0, price) : null
+      return { name, priceCents }
     })
-    .filter((item): item is { name: string; priceCents: number; items: string[] } => Boolean(item))
+    .filter((item): item is { name: string; priceCents: number | null } => Boolean(item))
 
   return normalized.length > 0 ? normalized : null
 }

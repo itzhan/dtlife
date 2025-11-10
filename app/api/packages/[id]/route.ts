@@ -83,20 +83,16 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     if (!Array.isArray(input)) return null
     const items = input
       .map((entry) => {
-        const payload = entry as { name?: unknown; priceCents?: unknown; priceYuan?: unknown; items?: unknown }
+        const payload = entry as { name?: unknown; priceCents?: unknown; priceYuan?: unknown }
         const name = parseString(payload.name)
         const price =
           parseNumber(payload.priceCents) ??
           (parseNumber(payload.priceYuan) != null ? Math.round(Number(payload.priceYuan) * 100) : null)
         if (!name) return null
-        const detailItems = Array.isArray(payload.items)
-          ? payload.items
-              .map((item) => parseString(item))
-              .filter((item): item is string => Boolean(item))
-          : []
-        return { name, priceCents: Math.max(0, price ?? 0), items: detailItems }
+        const priceCents = price != null ? Math.max(0, price) : null
+        return { name, priceCents }
       })
-      .filter((entry): entry is { name: string; priceCents: number; items: string[] } => Boolean(entry))
+      .filter((entry): entry is { name: string; priceCents: number | null } => Boolean(entry))
     return items.length > 0 ? items : null
   }
 

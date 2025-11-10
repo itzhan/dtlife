@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 type StoreDetail = { name: string; items: string[] }
-type PackageItem = { name: string; priceCents: number; items: string[] }
+type PackageItem = { name: string; priceCents: number | null }
 
 function parseStoreDetails(input: Prisma.JsonValue | null): StoreDetail[] {
   if (!Array.isArray(input)) return []
@@ -35,15 +35,8 @@ function parsePackageItems(input: Prisma.JsonValue | null): PackageItem[] {
     const name = typeof maybeRecord.name === 'string' ? maybeRecord.name.trim() : ''
     if (!name) continue
     const priceRaw = Number(maybeRecord.priceCents)
-    const price = Number.isFinite(priceRaw) ? Math.max(0, Math.round(priceRaw)) : 0
-    const itemsRaw = maybeRecord.items
-    const items =
-      Array.isArray(itemsRaw)
-        ? itemsRaw
-            .map((item) => (typeof item === 'string' ? item.trim() : null))
-            .filter((item): item is string => Boolean(item))
-        : []
-    result.push({ name, priceCents: price, items })
+    const price = Number.isFinite(priceRaw) ? Math.max(0, Math.round(priceRaw)) : null
+    result.push({ name, priceCents: price })
   }
   return result
 }
@@ -80,9 +73,11 @@ export async function POST(req: NextRequest) {
   const storeDetails = parseStoreDetails(pkg.storeDetails)
   const packageItems = parsePackageItems(pkg.packageItems)
   const storeCount = pkg.storeCount > 0 ? pkg.storeCount : storeDetails.length
+  const stockValidUntil = fallbackStock?.validUntil ?? null
   return NextResponse.json({
     code: c.code,
     orderNumber: c.orderNumber,
+    stockValidUntil: stockValidUntil ? stockValidUntil.toISOString() : null,
     package: {
       id: pkg.id,
       name: pkg.name,

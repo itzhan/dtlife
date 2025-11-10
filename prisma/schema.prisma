@@ -42,6 +42,7 @@ model Stock {
   code       String   @unique
   used       Boolean  @default(false)
   usedAt     DateTime?
+  validUntil DateTime?
   createdAt  DateTime @default(now())
   packageId  String
   package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)

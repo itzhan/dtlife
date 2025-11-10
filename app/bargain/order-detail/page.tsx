@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { message } from "antd";
@@ -16,13 +17,14 @@ type DestroyStatus = 1 | 2
 type GoodsCodeType = '1' | '2' | '3'
 
 type ApiStoreDetail = { name: string; items: string[] }
-type ApiPackageItem = { name: string; priceCents: number; items: string[] }
+type ApiPackageItem = { name: string; priceCents: number | null }
 
 type UserOpenResponse = {
   code: string
   orderNumber: string | null
   verificationCode: string | null
   unusedStock: number
+  stockValidUntil: string | null
   payStatus?: PayStatus
   destroyStatus?: DestroyStatus
   package: {
@@ -54,17 +56,16 @@ const formatPrice = (priceCents?: number | null) => {
   return (priceCents / 100).toFixed(2)
 }
 
-const formatValidUntil = () => {
-  const now = new Date()
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000
-  const shanghaiDate = new Date(utcMs + 8 * 60 * 60 * 1000)
-  shanghaiDate.setDate(shanghaiDate.getDate() + 2)
-  shanghaiDate.setHours(23, 59, 59, 0)
-  const pad = (num: number, length = 2) => String(num).padStart(length, "0")
-  const year = shanghaiDate.getFullYear()
-  const month = pad(shanghaiDate.getMonth() + 1)
-  const day = pad(shanghaiDate.getDate())
-  return `${year}-${month}-${day} 23:59:59`
+const formatDateWithTime = (input?: string | null) => {
+  if (!input) return null
+  const dateMatch = input.match(/\d{4}-\d{1,2}-\d{1,2}/)
+  if (dateMatch) {
+    return `${dateMatch[0]} 23:59:59`
+  }
+  const d = new Date(input)
+  if (Number.isNaN(d.valueOf())) return null
+  const pad = (num: number) => String(num).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} 23:59:59`
 }
 
 const normalizeGoodsCodeType = (value?: number | null): GoodsCodeType => {
@@ -196,6 +197,8 @@ function OrderDetailPageInner() {
     orginPrice: formatPrice(pkg.originalPriceCents) ?? "0.00",
     nowPrice: formatPrice(pkg.priceCents) ?? "0.00",
   };
+  const showSalePrice = typeof pkg.priceCents === "number" && pkg.priceCents > 0;
+  const showOriginalPrice = typeof pkg.originalPriceCents === "number" && pkg.originalPriceCents > 0;
 
   const goodsCodeType: GoodsCodeType = normalizeGoodsCodeType(pkg.goodsCodeType);
   const cardNum = pkg.cardNumber ?? "";
@@ -205,12 +208,9 @@ function OrderDetailPageInner() {
       : orderDetail.verificationCode ?? pkg.cardNumber ?? "";
   const store_source_id = pkg.storeSourceId ?? 1;
   const qrcodeSize = 210;
-  const useLink = pkg.useLink ?? "";
   const orderNum = orderDetail.orderNumber ?? orderDetail.code;
-  const time_valid = formatValidUntil();
+  const time_valid = formatDateWithTime(orderDetail?.stockValidUntil);
   const user_points: number | null = typeof pkg.userPoints === 'number' && pkg.userPoints > 0 ? pkg.userPoints : null;
-  const storeId = pkg.storeId ?? "";
-  const goodsId = pkg.goodsId ?? "";
   const useStoreNum = pkg.storeCount ?? pkg.storeDetails?.length ?? 0;
   const store_name = pkg.primaryStoreName ?? "指定门店";
   const storeAddress = pkg.primaryStoreAddress ?? "门店地址待完善";
@@ -325,11 +325,13 @@ function OrderDetailPageInner() {
             />
             <div className="package-card__body">
               <div className="package-card__name">{spinfo.spname}</div>
-              <div className="package-card__details">
-                <div className="package-card__price-original">
-                  售价：{spinfo.orginPrice}
+              {showSalePrice && (
+                <div className="package-card__details">
+                  <div className="package-card__price-original">
+                    售价：{spinfo.nowPrice}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <div className="package-card__summary" />
           </a>
@@ -470,18 +472,16 @@ function OrderDetailPageInner() {
                 复制
               </span>
             </div>
-            {time_valid ? (
-              <div className="info-row">
-                <span className="info-row__label">有效期至：</span>
-                <span className="info-row__value">{time_valid}</span>
-              </div>
-            ) : (
-              <span className="data-v-389a9f20" />
-            )}
-            <div className="info-row info-row--payment">
-              <span className="info-row__label">原       价：</span>
-              <span className="info-row__value">¥{spinfo.orginPrice}</span>
+            <div className="info-row">
+              <span className="info-row__label">有效期至：</span>
+              <span className="info-row__value">{time_valid ?? "长期有效"}</span>
             </div>
+            {showOriginalPrice && (
+              <div className="info-row info-row--payment">
+                <span className="info-row__label">原        价：</span>
+                <span className="info-row__value">¥{spinfo.orginPrice}</span>
+              </div>
+            )}
             {user_points == null ? (
               <div className="info-row info-row--payment" />
             ) : (
@@ -553,9 +553,7 @@ function OrderDetailPageInner() {
               {package_items.map((it, idx) => (
                 <div className="package-list__item" key={idx}>
                   <div className="package-list__name">{it.name}</div>
-                  {it.price && it.price > 0 ? (
-                    <div className="price-amount">¥{it.price}</div>
-                  ) : null}
+                  {it.price != null && it.price > 0 ? <div className="price-amount">¥{it.price}</div> : null}
                 </div>
               ))}
             </div>
@@ -566,12 +564,18 @@ function OrderDetailPageInner() {
       {!false && paybutton === '1' && (
         <div className="order-footer">
           <div className="order-footer__content">
-            <div className="price-amount">
-              <span className="order-footer__price-now">
-                ¥<span className="data-v-389a9f20">{spinfo.nowPrice}</span>
-              </span>
-              <span className="order-footer__price-original">¥{spinfo.orginPrice}</span>
-            </div>
+            {(showSalePrice || showOriginalPrice) && (
+              <div className="price-amount">
+                {showSalePrice && (
+                  <span className="order-footer__price-now">
+                    ¥<span className="data-v-389a9f20">{spinfo.nowPrice}</span>
+                  </span>
+                )}
+                {showOriginalPrice && (
+                  <span className="order-footer__price-original">¥{spinfo.orginPrice}</span>
+                )}
+              </div>
+            )}
             <div className="order-footer__actions u-clearfix">
               <div className="order-footer__cancel">取消订单</div>
               <div className="order-footer__pay">立即支付</div>
