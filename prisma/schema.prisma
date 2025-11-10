@@ -55,6 +55,7 @@ model LoginCode {
   code       String   @unique
   active     Boolean  @default(true)
   expiresAt  DateTime?
+  shareLink  String?
   orderNumber String?
   createdAt  DateTime @default(now())
   packageId  String

@@ -16,7 +16,9 @@ const parseValidDate = (value: unknown) => {
   if (!trimmed) return null
   const date = new Date(trimmed)
   if (Number.isNaN(date.valueOf())) return null
-  date.setHours(23, 59, 59, 0)
+  if (!trimmed.includes('T')) {
+    date.setHours(23, 59, 59, 0)
+  }
   return date
 }
 
@@ -25,7 +27,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (!id) return NextResponse.json({ message: '参数错误' }, { status: 400 })
   const s = await readAdminSession()
   if (!s) return NextResponse.json({ message: '未认证' }, { status: 401 })
-  const origin = req.nextUrl.origin
   const items = await prisma.stock.findMany({
     where: { packageId: id },
     orderBy: { createdAt: 'desc' },
@@ -35,7 +36,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const shaped = items.map((item) => {
     const { loginCodes, ...rest } = item
     const shareCode = loginCodes[0]?.code ?? null
-    const shareLink = shareCode ? `${origin}/bargain/order-detail?code=${encodeURIComponent(shareCode)}` : null
+    const shareLink =
+      loginCodes[0]?.shareLink ??
+      (shareCode ? `${req.nextUrl.origin}/bargain/order-detail?code=${encodeURIComponent(shareCode)}` : null)
     return { ...rest, shareCode, shareLink }
   })
   return NextResponse.json(shaped)

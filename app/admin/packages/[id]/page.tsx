@@ -246,7 +246,7 @@ export default function PackageDetailPage() {
     try {
       const payload = {
         code: trimmed,
-        validDate: editingStockValue.validDate ? editingStockValue.validDate.format('YYYY-MM-DD') : null,
+        validDate: editingStockValue.validDate ? editingStockValue.validDate.endOf('day').toISOString() : null,
       }
       const res = await fetch(`/api/stocks/${editingStockId}`, {
         method: 'PUT',
@@ -524,7 +524,9 @@ export default function PackageDetailPage() {
                     entries: [
                       {
                         code,
-                        validDate: current?.validDate ? (current.validDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+                        validDate: current?.validDate
+                          ? (current.validDate as dayjs.Dayjs).endOf('day').toISOString()
+                          : undefined,
                       },
                     ],
                   }
@@ -568,9 +570,11 @@ export default function PackageDetailPage() {
                 dataIndex: 'code',
                 render: (_value, record) => {
                   if (record.kind === 'new') {
+                      const fieldKey = record.field.fieldKey ?? record.field.key
                       return (
                         <Form.Item
-                          name={['newStocks', record.field.name, 'code']}
+                          name={[record.field.name, 'code']}
+                          fieldKey={[fieldKey, 'code']}
                           rules={[{ required: true, message: '请输入核销码' }]}
                           style={{ marginBottom: 0 }}
                         >
@@ -594,8 +598,13 @@ export default function PackageDetailPage() {
                 dataIndex: 'validUntil',
                 render: (_value, record) => {
                   if (record.kind === 'new') {
+                    const fieldKey = record.field.fieldKey ?? record.field.key
                     return (
-                      <Form.Item name={['newStocks', record.field.name, 'validDate']} style={{ marginBottom: 0 }}>
+                      <Form.Item
+                        name={[record.field.name, 'validDate']}
+                        fieldKey={[fieldKey, 'validDate']}
+                        style={{ marginBottom: 0 }}
+                      >
                         <DatePicker style={{ width: '100%' }} placeholder="选择日期" />
                       </Form.Item>
                     )

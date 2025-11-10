@@ -56,6 +56,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   })
   if (!stock) return NextResponse.json({ message: '库存不存在' }, { status: 404 })
 
+  const origin = resolveShareOrigin(req)
   let attempt = 0
   while (attempt < MAX_ATTEMPTS) {
     const code = generateNumericCode()
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       if (target) {
         const updated = await prisma.loginCode.update({
           where: { id: target.id },
-          data: { code, active: true },
+          data: { code, active: true, shareLink: buildShareLink(origin, code) },
         })
         effectiveCode = updated.code
       } else {
@@ -75,11 +76,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
             packageId: stock.packageId,
             active: true,
             stockId: stock.id,
+            shareLink: buildShareLink(origin, code),
           },
         })
         effectiveCode = created.code
       }
-      const origin = resolveShareOrigin(req)
       const link = buildShareLink(origin, effectiveCode)
       return NextResponse.json({ code: effectiveCode, link })
     } catch (error) {
