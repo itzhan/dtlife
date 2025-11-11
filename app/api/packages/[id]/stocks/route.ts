@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
 import { prisma } from '@/lib/prisma'
 import { readAdminSession } from '@/lib/auth'
+
+dayjs.extend(customParseFormat)
 
 type RouteContext = { params: Promise<{ id: string }> } | { params: { id: string } }
 
@@ -20,6 +24,41 @@ const parseValidDate = (value: unknown) => {
     date.setHours(23, 59, 59, 0)
   }
   return date
+}
+
+const ORDER_PREFIX = '102'
+const ORDER_NUMBER_DATE_LENGTH = 8
+const ORDER_NUMBER_PATTERN = /^102\d{21}$/
+
+const parseOrderNumber = (value: unknown) => {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (!ORDER_NUMBER_PATTERN.test(trimmed)) return null
+  const datePart = trimmed.slice(ORDER_PREFIX.length, ORDER_PREFIX.length + ORDER_NUMBER_DATE_LENGTH)
+  const parsed = dayjs(datePart, 'YYYYMMDD', true)
+  if (!parsed.isValid()) return null
+  return trimmed
+}
+
+const parseValidDays = (value: unknown) => {
+  if (value == null) return null
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return null
+  const intValue = Math.trunc(num)
+  if (intValue <= 0) return null
+  return intValue
+}
+
+const deriveValidUntil = (orderNumber: string | null, validDays: number | null, fallback: Date | null = null) => {
+  if (orderNumber && validDays) {
+    const datePart = orderNumber.slice(ORDER_PREFIX.length, ORDER_PREFIX.length + ORDER_NUMBER_DATE_LENGTH)
+    const purchase = dayjs(datePart, 'YYYYMMDD', true)
+    if (purchase.isValid()) {
+      return purchase.add(validDays - 1, 'day').endOf('day').toDate()
+    }
+  }
+  return fallback
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
@@ -49,14 +88,27 @@ export async function POST(req: NextRequest, context: RouteContext) {
   if (!id) return NextResponse.json({ message: '参数错误' }, { status: 400 })
   const s = await readAdminSession()
   if (!s) return NextResponse.json({ message: '未认证' }, { status: 401 })
-  const payload = await req.json().catch(() => null) as { codes?: unknown; entries?: { code?: unknown; validDate?: unknown }[] } | null
-  let targets: { code: string; validUntil: Date | null }[] = []
+  const payload = (await req.json().catch(() => null)) as
+    | {
+        codes?: unknown
+        entries?: { code?: unknown; validDate?: unknown; orderNumber?: unknown; validDays?: unknown }[]
+      }
+    | null
+  let targets: { code: string; validUntil: Date | null; orderNumber: string | null; validDays: number | null }[] = []
   if (Array.isArray(payload?.entries) && payload.entries.length > 0) {
     targets = payload.entries
-      .map((entry) => ({
-        code: typeof entry.code === 'string' ? entry.code.trim() : '',
-        validUntil: parseValidDate(entry.validDate),
-      }))
+      .map((entry) => {
+        const code = typeof entry.code === 'string' ? entry.code.trim() : ''
+        const orderNumber = parseOrderNumber(entry.orderNumber)
+        const validDays = parseValidDays(entry.validDays)
+        const fallbackDate = parseValidDate(entry.validDate)
+        return {
+          code,
+          orderNumber,
+          validDays,
+          validUntil: deriveValidUntil(orderNumber, validDays, fallbackDate),
+        }
+      })
       .filter((entry) => entry.code.length > 0)
   } else if (Array.isArray(payload?.codes)) {
     const codesInput = payload.codes as unknown[]
@@ -67,16 +119,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
           .filter((c): c is string => c.length > 0)
       )
     )
-    targets = filtered.map((code) => ({ code, validUntil: null }))
+    targets = filtered.map((code) => ({ code, validUntil: null, orderNumber: null, validDays: null }))
   }
 
   if (targets.length === 0) return NextResponse.json({ message: '无有效核销码' }, { status: 400 })
 
-  const operations = targets.map(({ code, validUntil }) =>
+  const operations = targets.map(({ code, validUntil, orderNumber, validDays }) =>
     prisma.stock.create({
       data: {
         code,
         validUntil: validUntil ?? undefined,
+        orderNumber: orderNumber ?? undefined,
+        validDays: validDays ?? undefined,
         package: { connect: { id } },
       },
     })

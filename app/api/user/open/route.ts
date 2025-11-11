@@ -74,9 +74,10 @@ export async function POST(req: NextRequest) {
   const packageItems = parsePackageItems(pkg.packageItems)
   const storeCount = pkg.storeCount > 0 ? pkg.storeCount : storeDetails.length
   const stockValidUntil = fallbackStock?.validUntil ?? null
+  const stockOrderNumber = fallbackStock?.orderNumber ?? null
   return NextResponse.json({
     code: c.code,
-    orderNumber: c.orderNumber,
+    orderNumber: stockOrderNumber ?? c.orderNumber,
     stockValidUntil: stockValidUntil ? stockValidUntil.toISOString() : null,
     package: {
       id: pkg.id,

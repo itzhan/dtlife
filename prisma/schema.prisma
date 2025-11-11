@@ -43,6 +43,8 @@ model Stock {
   used       Boolean  @default(false)
   usedAt     DateTime?
   validUntil DateTime?
+  orderNumber String?
+  validDays   Int?
   createdAt  DateTime @default(now())
   packageId  String
   package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)

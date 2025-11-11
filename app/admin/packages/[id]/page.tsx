@@ -4,13 +4,14 @@ import {
   Button,
   Card,
   Collapse,
-  DatePicker,
   Descriptions,
   Drawer,
   Flex,
   Form,
   Input,
   InputNumber,
+  Modal,
+  Select,
   Popconfirm,
   Space,
   Table,
@@ -58,6 +59,8 @@ type Stock = {
   validUntil?: string | null
   shareCode?: string | null
   shareLink?: string | null
+  orderNumber?: string | null
+  validDays?: number | null
 }
 
 type PackageItemFormRow = { name?: string; priceYuan?: number | null }
@@ -71,7 +74,8 @@ type UpdateFormValues = {
   primaryStorePhone?: string
 }
 type PackageItemFormValues = { packageItems?: PackageItemFormRow[] }
-type NewStockFormValues = { newStocks?: { code?: string; validDate?: dayjs.Dayjs | null }[] }
+type NewStockFormValues = { newStocks?: { code?: string; orderNumber?: string; validDays?: number | null }[] }
+type QuickEntryFormValues = { orderNumber?: string; validDays?: number | null }
 
 const RAW_SHARE_LINK_ORIGIN = (process.env.NEXT_PUBLIC_SHARE_LINK_ORIGIN || '').trim()
 
@@ -82,6 +86,32 @@ const sanitizeOrigin = (origin: string, runtimeProtocol?: string) => {
   const protocol = runtimeProtocol || 'https:'
   const normalizedProtocol = protocol.endsWith(':') ? protocol : `${protocol}:`
   return `${normalizedProtocol}//${trimmed}`
+}
+
+const ORDER_NUMBER_PREFIX = '102'
+const ORDER_NUMBER_REGEX = /^102\d{21}$/
+const ORDER_NUMBER_DATE_LENGTH = 8
+
+const extractPurchaseDate = (orderNumber?: string | null) => {
+  if (!orderNumber) return null
+  const trimmed = orderNumber.trim()
+  if (!ORDER_NUMBER_REGEX.test(trimmed)) return null
+  const datePart = trimmed.slice(ORDER_NUMBER_PREFIX.length, ORDER_NUMBER_PREFIX.length + ORDER_NUMBER_DATE_LENGTH)
+  const parsed = dayjs(datePart, 'YYYYMMDD', true)
+  return parsed.isValid() ? parsed : null
+}
+
+const deriveValidUntilText = (orderNumber?: string | null, validDays?: number | null) => {
+  if (!validDays || validDays <= 0) return null
+  const purchase = extractPurchaseDate(orderNumber)
+  if (!purchase) return null
+  return purchase.add(validDays - 1, 'day').format('YYYY-MM-DD')
+}
+
+const isValidOrderNumber = (value?: string | null) => {
+  if (!value) return false
+  const trimmed = value.trim()
+  return ORDER_NUMBER_REGEX.test(trimmed) && extractPurchaseDate(trimmed) !== null
 }
 
 export default function PackageDetailPage() {
@@ -96,14 +126,19 @@ export default function PackageDetailPage() {
   const [generatingLinkId, setGeneratingLinkId] = useState<string | null>(null)
   const [creatingStockKey, setCreatingStockKey] = useState<string | null>(null)
   const [editingStockId, setEditingStockId] = useState<string | null>(null)
-  const [editingStockValue, setEditingStockValue] = useState<{ code: string; validDate: dayjs.Dayjs | null }>({
+  const [editingStockValue, setEditingStockValue] = useState<{ code: string; orderNumber: string; validDays: number | null; used: boolean }>({
     code: '',
-    validDate: null,
+    orderNumber: '',
+    validDays: null,
+    used: false,
   })
   const [windowOrigin, setWindowOrigin] = useState(() => (RAW_SHARE_LINK_ORIGIN ? sanitizeOrigin(RAW_SHARE_LINK_ORIGIN) : ''))
   const [editForm] = Form.useForm<UpdateFormValues>()
   const [packageForm] = Form.useForm<PackageItemFormValues>()
   const [stockForm] = Form.useForm<NewStockFormValues>()
+  const [quickEntryForm] = Form.useForm<QuickEntryFormValues>()
+  const [quickEntryVisible, setQuickEntryVisible] = useState(false)
+  const [quickEntrySubmitting, setQuickEntrySubmitting] = useState(false)
 
   const load = useCallback(
     async (withSpinner = true) => {
@@ -132,7 +167,7 @@ export default function PackageDetailPage() {
         }
         if (stocksRes.ok) {
           const stockData = (await stocksRes.json()) as Stock[]
-          stockData.sort((a, b) => new Date(b.createdAt).valueOf() - new Date(a.createdAt).valueOf())
+          stockData.sort((a, b) => new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf())
           setStocks(stockData)
         }
       } catch (error) {
@@ -230,23 +265,34 @@ export default function PackageDetailPage() {
     setEditingStockId(stock.id)
     setEditingStockValue({
       code: stock.code,
-      validDate: stock.validUntil ? dayjs(stock.validUntil) : null,
+      orderNumber: stock.orderNumber ?? '',
+      validDays: stock.validDays ?? null,
+      used: stock.used,
     })
   }
 
   const cancelEditStock = () => {
     setEditingStockId(null)
-    setEditingStockValue({ code: '', validDate: null })
+    setEditingStockValue({ code: '', orderNumber: '', validDays: null, used: false })
   }
 
   const onSaveStock = async () => {
     if (!editingStockId) return
     const trimmed = editingStockValue.code.trim()
     if (!trimmed) return messageApi.warning('请输入核销码')
+    const normalizedOrderNumber = editingStockValue.orderNumber.trim()
+    if (!isValidOrderNumber(normalizedOrderNumber)) return messageApi.warning('请输入有效的订单号')
+    const normalizedValidDays =
+      typeof editingStockValue.validDays === 'number' && editingStockValue.validDays > 0
+        ? Math.trunc(editingStockValue.validDays)
+        : null
+    if (!normalizedValidDays) return messageApi.warning('请输入有效期天数')
     try {
       const payload = {
         code: trimmed,
-        validDate: editingStockValue.validDate ? editingStockValue.validDate.endOf('day').toISOString() : null,
+        orderNumber: normalizedOrderNumber,
+        validDays: normalizedValidDays,
+        used: editingStockValue.used,
       }
       const res = await fetch(`/api/stocks/${editingStockId}`, {
         method: 'PUT',
@@ -318,6 +364,50 @@ export default function PackageDetailPage() {
       messageApi.error('生成链接失败')
     } finally {
       setGeneratingLinkId(null)
+    }
+  }
+
+  const openQuickEntry = () => {
+    quickEntryForm.resetFields()
+    setQuickEntryVisible(true)
+  }
+
+  const handleQuickEntrySubmit = async () => {
+    if (!id) return messageApi.error('缺少套餐ID')
+    try {
+      const values = await quickEntryForm.validateFields()
+      const orderNumber = (values.orderNumber || '').trim()
+      if (!isValidOrderNumber(orderNumber)) return messageApi.warning('请输入有效的订单号')
+      const normalizedValidDays =
+        typeof values.validDays === 'number' && values.validDays > 0 ? Math.trunc(values.validDays) : null
+      if (!normalizedValidDays) return messageApi.warning('请输入有效期天数')
+      setQuickEntrySubmitting(true)
+      const payload = {
+        entries: [
+          {
+            code: orderNumber,
+            orderNumber,
+            validDays: normalizedValidDays,
+          },
+        ],
+      }
+      const res = await fetch(`/api/packages/${id}/stocks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({} as { message?: string }))
+      if (!res.ok) return messageApi.error(data.message || '录入失败')
+      messageApi.success('录入成功')
+      setQuickEntryVisible(false)
+      quickEntryForm.resetFields()
+      void load()
+    } catch (error) {
+      if ((error as { errorFields?: unknown })?.errorFields) return
+      console.error(error)
+      messageApi.error('录入失败')
+    } finally {
+      setQuickEntrySubmitting(false)
     }
   }
 
@@ -505,12 +595,16 @@ export default function PackageDetailPage() {
         <Form form={stockForm} component={false}>
           <Form.List name="newStocks">
             {(fields, helpers) => {
-              const addRow = () => helpers.add({})
+              const addRow = () => helpers.add({ validDays: 30 })
               const removeRow = (field: FormListFieldData) => helpers.remove(field.name)
               const saveRow = async (field: FormListFieldData) => {
                 const fieldName = field.name as number
                 try {
-                  await stockForm.validateFields([['newStocks', fieldName, 'code']])
+                  await stockForm.validateFields([
+                    ['newStocks', fieldName, 'code'],
+                    ['newStocks', fieldName, 'orderNumber'],
+                    ['newStocks', fieldName, 'validDays'],
+                  ])
                 } catch {
                   return
                 }
@@ -518,15 +612,20 @@ export default function PackageDetailPage() {
                 const current = list[fieldName]
                 const code = (current?.code || '').trim()
                 if (!code) return messageApi.warning('请输入核销码')
+                const orderNumber = (current?.orderNumber || '').trim()
+                if (!isValidOrderNumber(orderNumber)) return messageApi.warning('请输入有效的订单号')
+                const rawValidDays = current?.validDays
+                const normalizedValidDays =
+                  typeof rawValidDays === 'number' && rawValidDays > 0 ? Math.trunc(rawValidDays) : null
+                if (!normalizedValidDays) return messageApi.warning('请输入有效期天数')
                 setCreatingStockKey(String(field.key))
                 try {
                   const payload = {
                     entries: [
                       {
                         code,
-                        validDate: current?.validDate
-                          ? (current.validDate as dayjs.Dayjs).endOf('day').toISOString()
-                          : undefined,
+                        orderNumber,
+                        validDays: normalizedValidDays,
                       },
                     ],
                   }
@@ -565,11 +664,11 @@ export default function PackageDetailPage() {
                   width: 70,
                   render: (_value, record) => (record.kind === 'existing' ? record.order : '-'),
                 },
-              {
-                title: '核销码',
-                dataIndex: 'code',
-                render: (_value, record) => {
-                  if (record.kind === 'new') {
+                {
+                  title: '核销码',
+                  dataIndex: 'code',
+                  render: (_value, record) => {
+                    if (record.kind === 'new') {
                       const fieldKey = record.field.fieldKey ?? record.field.key
                       return (
                         <Form.Item
@@ -581,66 +680,171 @@ export default function PackageDetailPage() {
                           <Input placeholder="例如：ABC-123" />
                         </Form.Item>
                       )
-                  }
-                  if (record.kind === 'existing' && editingStockId === record.stock.id) {
-                    return (
-                      <Input
-                        value={editingStockValue.code}
-                        onChange={(e) => setEditingStockValue((prev) => ({ ...prev, code: e.target.value }))}
-                      />
-                    )
-                  }
-                  return <Typography.Text code>{record.stock.code}</Typography.Text>
+                    }
+                    if (record.kind === 'existing' && editingStockId === record.stock.id) {
+                      return (
+                        <Input
+                          value={editingStockValue.code}
+                          onChange={(e) => setEditingStockValue((prev) => ({ ...prev, code: e.target.value }))}
+                        />
+                      )
+                    }
+                    return <Typography.Text code>{record.stock.code}</Typography.Text>
+                  },
                 },
-              },
-              {
-                title: '核销有效期',
-                dataIndex: 'validUntil',
-                render: (_value, record) => {
-                  if (record.kind === 'new') {
-                    const fieldKey = record.field.fieldKey ?? record.field.key
-                    return (
-                      <Form.Item
-                        name={[record.field.name, 'validDate']}
-                        fieldKey={[fieldKey, 'validDate']}
-                        style={{ marginBottom: 0 }}
-                      >
-                        <DatePicker style={{ width: '100%' }} placeholder="选择日期" />
-                      </Form.Item>
+                {
+                  title: '订单号',
+                  dataIndex: 'orderNumber',
+                  render: (_value, record) => {
+                    if (record.kind === 'new') {
+                      const fieldKey = record.field.fieldKey ?? record.field.key
+                      return (
+                        <Form.Item
+                          name={[record.field.name, 'orderNumber']}
+                          fieldKey={[fieldKey, 'orderNumber']}
+                          rules={[
+                            { required: true, message: '请输入订单号' },
+                            {
+                              validator: (_rule, value) => {
+                                if (!value) return Promise.resolve()
+                                return isValidOrderNumber(String(value).trim())
+                                  ? Promise.resolve()
+                                  : Promise.reject(new Error('订单号格式不正确'))
+                              },
+                            },
+                          ]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Input placeholder="102 + 日期 + 13位随机码" maxLength={24} />
+                        </Form.Item>
+                      )
+                    }
+                    if (record.kind === 'existing' && editingStockId === record.stock.id) {
+                      return (
+                        <Input
+                          value={editingStockValue.orderNumber}
+                          maxLength={24}
+                          onChange={(e) => setEditingStockValue((prev) => ({ ...prev, orderNumber: e.target.value }))}
+                        />
+                      )
+                    }
+                    return record.stock.orderNumber ? (
+                      <Typography.Text>{record.stock.orderNumber}</Typography.Text>
+                    ) : (
+                      <Typography.Text type="secondary">-</Typography.Text>
                     )
-                  }
-                  if (record.kind === 'existing' && editingStockId === record.stock.id) {
-                    return (
-                      <DatePicker
-                        style={{ width: '100%' }}
-                        placeholder="选择日期"
-                        value={editingStockValue.validDate}
-                        onChange={(value) => setEditingStockValue((prev) => ({ ...prev, validDate: value }))}
-                      />
-                    )
-                  }
-                  return record.stock.validUntil ? (
-                    dayjs(record.stock.validUntil).format('YYYY-MM-DD')
-                  ) : (
-                    <Typography.Text type="secondary">未设置</Typography.Text>
-                  )
+                  },
                 },
-              },
+                {
+                  title: '有效期天数',
+                  dataIndex: 'validDays',
+                  render: (_value, record) => {
+                    if (record.kind === 'new') {
+                      const fieldKey = record.field.fieldKey ?? record.field.key
+                      return (
+                        <Form.Item
+                          name={[record.field.name, 'validDays']}
+                          fieldKey={[fieldKey, 'validDays']}
+                          rules={[{ required: true, message: '请输入有效期天数' }]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber min={1} precision={0} style={{ width: '100%' }} placeholder="天数" />
+                        </Form.Item>
+                      )
+                    }
+                    if (record.kind === 'existing' && editingStockId === record.stock.id) {
+                      return (
+                        <InputNumber
+                          min={1}
+                          precision={0}
+                          style={{ width: '100%' }}
+                          value={editingStockValue.validDays ?? undefined}
+                          onChange={(value) =>
+                            setEditingStockValue((prev) => ({
+                              ...prev,
+                              validDays: typeof value === 'number' ? value : null,
+                            }))
+                          }
+                        />
+                      )
+                    }
+                    return record.stock.validDays ? (
+                      <Typography.Text>{record.stock.validDays} 天</Typography.Text>
+                    ) : (
+                      <Typography.Text type="secondary">-</Typography.Text>
+                    )
+                  },
+                },
+                {
+                  title: '核销有效期',
+                  dataIndex: 'validUntil',
+                  render: (_value, record) => {
+                    if (record.kind === 'new') {
+                      return (
+                        <Form.Item shouldUpdate noStyle>
+                          {() => {
+                            const row = stockForm.getFieldValue(['newStocks', record.field.name]) || {}
+                            const preview = deriveValidUntilText(row?.orderNumber, row?.validDays)
+                            return preview ? (
+                              <Typography.Text>{preview}</Typography.Text>
+                            ) : (
+                              <Typography.Text type="secondary">依据订单号+天数自动计算</Typography.Text>
+                            )
+                          }}
+                        </Form.Item>
+                      )
+                    }
+                    if (record.kind === 'existing' && editingStockId === record.stock.id) {
+                      const preview = deriveValidUntilText(editingStockValue.orderNumber, editingStockValue.validDays)
+                      return preview ? (
+                        <Typography.Text>{preview}</Typography.Text>
+                      ) : (
+                        <Typography.Text type="secondary">-</Typography.Text>
+                      )
+                    }
+                    if (record.stock.validUntil) {
+                      return dayjs(record.stock.validUntil).format('YYYY-MM-DD')
+                    }
+                    const derived = deriveValidUntilText(record.stock.orderNumber, record.stock.validDays)
+                    return derived ? (
+                      <Typography.Text>{derived}</Typography.Text>
+                    ) : (
+                      <Typography.Text type="secondary">未设置</Typography.Text>
+                    )
+                  },
+                },
                 {
                   title: '状态',
                   dataIndex: 'used',
-                  render: (_value, record) =>
-                    record.kind === 'existing' ? (
-                      <Tag color={record.stock.used ? 'default' : 'green'}>{record.stock.used ? '已核销' : '未核销'}</Tag>
-                    ) : (
-                      '-'
-                    ),
+                  render: (_value, record) => {
+                    if (record.kind === 'new') return null
+                    if (editingStockId === record.stock.id) {
+                      return (
+                        <Select
+                          style={{ width: 120 }}
+                          value={editingStockValue.used ? 'used' : 'unused'}
+                          onChange={(value) =>
+                            setEditingStockValue((prev) => ({ ...prev, used: value === 'used' }))
+                          }
+                          options={[
+                            { label: '未核销', value: 'unused' },
+                            { label: '已核销', value: 'used' },
+                          ]}
+                        />
+                      )
+                    }
+                    return (
+                      <Tag color={record.stock.used ? 'default' : 'green'}>
+                        {record.stock.used ? '已核销' : '未核销'}
+                      </Tag>
+                    )
+                  },
                 },
                 {
                   title: '自动跳转链接',
                   dataIndex: 'shareCode',
                   render: (_value, record) => {
-                    if (record.kind === 'new') return '-'
+                    if (record.kind === 'new') return null
                     const link = buildShareLink(record.stock)
                     if (!link) return <Typography.Text type="secondary">-</Typography.Text>
                     const compact = link.replace(/^https?:\/\//, '').slice(0, 16)
@@ -717,9 +921,12 @@ export default function PackageDetailPage() {
               return (
                 <>
                   <Flex justify="flex-end" style={{ marginBottom: 12 }}>
-                    <Button type="dashed" onClick={addRow}>
-                      新增核销码
-                    </Button>
+                    <Space>
+                      <Button onClick={openQuickEntry}>快速录入</Button>
+                      <Button type="dashed" onClick={addRow}>
+                        新增核销码
+                      </Button>
+                    </Space>
                   </Flex>
                   <Table
                     rowKey="key"
@@ -735,6 +942,40 @@ export default function PackageDetailPage() {
         </Form>
       </Card>
       </Flex>
+      <Modal
+        title="快速录入"
+        open={quickEntryVisible}
+        onOk={() => void handleQuickEntrySubmit()}
+        confirmLoading={quickEntrySubmitting}
+        onCancel={() => setQuickEntryVisible(false)}
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+          订单号格式：102 + 购买年月日（YYYYMMDD）+ 13 位随机数字，核销有效期将根据订单日期与天数自动计算。
+        </Typography.Paragraph>
+        <Form form={quickEntryForm} layout="vertical">
+          <Form.Item
+            name="orderNumber"
+            label="订单号"
+            rules={[
+              { required: true, message: '请输入订单号' },
+              {
+                validator: (_rule, value) => {
+                  if (!value) return Promise.resolve()
+                  return isValidOrderNumber(String(value).trim())
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('订单号格式不正确'))
+                },
+              },
+            ]}
+          >
+            <Input placeholder="例如：102202511102247075225940" maxLength={24} />
+          </Form.Item>
+          <Form.Item name="validDays" label="有效期天数" rules={[{ required: true, message: '请输入有效期天数' }]}>
+            <InputNumber min={1} precision={0} placeholder="例如：30" style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   )
 }
