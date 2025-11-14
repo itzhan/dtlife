@@ -53,6 +53,7 @@ type Pkg = {
 type Stock = {
   id: string
   code: string
+  serialNumber?: number | null
   used: boolean
   createdAt: string
   usedAt?: string | null
@@ -126,8 +127,15 @@ export default function PackageDetailPage() {
   const [generatingLinkId, setGeneratingLinkId] = useState<string | null>(null)
   const [creatingStockKey, setCreatingStockKey] = useState<string | null>(null)
   const [editingStockId, setEditingStockId] = useState<string | null>(null)
-  const [editingStockValue, setEditingStockValue] = useState<{ code: string; orderNumber: string; validDays: number | null; used: boolean }>({
+  const [editingStockValue, setEditingStockValue] = useState<{
+    code: string
+    serialNumber: number | null
+    orderNumber: string
+    validDays: number | null
+    used: boolean
+  }>({
     code: '',
+    serialNumber: null,
     orderNumber: '',
     validDays: null,
     used: false,
@@ -167,7 +175,6 @@ export default function PackageDetailPage() {
         }
         if (stocksRes.ok) {
           const stockData = (await stocksRes.json()) as Stock[]
-          stockData.sort((a, b) => new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf())
           setStocks(stockData)
         }
       } catch (error) {
@@ -263,8 +270,13 @@ export default function PackageDetailPage() {
 
   const startEditStock = (stock: Stock) => {
     setEditingStockId(stock.id)
+    const fallbackSerial =
+      typeof stock.serialNumber === 'number'
+        ? stock.serialNumber
+        : stocks.findIndex((item) => item.id === stock.id) + 1
     setEditingStockValue({
       code: stock.code,
+      serialNumber: Number.isFinite(fallbackSerial) && fallbackSerial > 0 ? fallbackSerial : 1,
       orderNumber: stock.orderNumber ?? '',
       validDays: stock.validDays ?? null,
       used: stock.used,
@@ -273,7 +285,7 @@ export default function PackageDetailPage() {
 
   const cancelEditStock = () => {
     setEditingStockId(null)
-    setEditingStockValue({ code: '', orderNumber: '', validDays: null, used: false })
+    setEditingStockValue({ code: '', serialNumber: null, orderNumber: '', validDays: null, used: false })
   }
 
   const onSaveStock = async () => {
@@ -287,11 +299,17 @@ export default function PackageDetailPage() {
         ? Math.trunc(editingStockValue.validDays)
         : null
     if (!normalizedValidDays) return messageApi.warning('请输入有效期天数')
+    const normalizedSerialNumber =
+      typeof editingStockValue.serialNumber === 'number' && editingStockValue.serialNumber > 0
+        ? Math.trunc(editingStockValue.serialNumber)
+        : null
+    if (!normalizedSerialNumber) return messageApi.warning('请输入有效的序号')
     try {
       const payload = {
         code: trimmed,
         orderNumber: normalizedOrderNumber,
         validDays: normalizedValidDays,
+        serialNumber: normalizedSerialNumber,
         used: editingStockValue.used,
       }
       const res = await fetch(`/api/stocks/${editingStockId}`, {
@@ -318,15 +336,25 @@ export default function PackageDetailPage() {
     return `${windowOrigin}${relative}`
   }
 
-  const copyShareLink = async (stock: Stock) => {
+  const resolveValidUntilForCopy = (stock: Stock) => {
+    if (stock.validUntil) return dayjs(stock.validUntil).format('YYYY-MM-DD')
+    return deriveValidUntilText(stock.orderNumber, stock.validDays)
+  }
+
+  const copyStockSummary = async (stock: Stock) => {
     const link = buildShareLink(stock)
     if (!link) return messageApi.warning('请先生成链接')
+    const serialPrefix = typeof stock.serialNumber === 'number' ? `${stock.serialNumber}.` : ''
+    const orderText = stock.orderNumber?.trim() || '无订单号'
+    const validText = resolveValidUntilForCopy(stock)
+    const remark = (pkg?.description ?? '').trim() || '无备注'
+    const payload = `${serialPrefix}订单：${orderText}\n核销地址：${link}\n有效期：${validText ? `${validText}日` : '-'}\n备注：${remark}`
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link)
+        await navigator.clipboard.writeText(payload)
       } else {
         const textarea = document.createElement('textarea')
-        textarea.value = link
+        textarea.value = payload
         textarea.style.position = 'fixed'
         textarea.style.opacity = '0'
         document.body.appendChild(textarea)
@@ -334,7 +362,7 @@ export default function PackageDetailPage() {
         document.execCommand('copy')
         document.body.removeChild(textarea)
       }
-      messageApi.success('链接已复制')
+      messageApi.success('信息已复制')
     } catch (error) {
       console.error(error)
       messageApi.error('复制失败，请手动复制')
@@ -648,21 +676,53 @@ export default function PackageDetailPage() {
                 }
               }
 
+              const highestSerial = stocks.reduce(
+                (max, stock) => (typeof stock.serialNumber === 'number' ? Math.max(max, stock.serialNumber) : max),
+                0
+              )
+              const serialBase = highestSerial > 0 ? highestSerial : stocks.length
+
               type StockTableRecord =
                 | { key: string; kind: 'new'; field: FormListFieldData }
-                | { key: string; kind: 'existing'; stock: Stock; order: number }
+                | { key: string; kind: 'existing'; stock: Stock }
 
               const dataSource: StockTableRecord[] = [
-                ...fields.map((field) => ({ key: `new-${field.key}`, kind: 'new' as const, field })),
-                ...stocks.map((stock, idx) => ({ key: stock.id, kind: 'existing' as const, stock, order: idx + 1 })),
+                ...fields.map((field) => ({
+                  key: `new-${field.key}`,
+                  kind: 'new' as const,
+                  field,
+                })),
+                ...stocks.map((stock) => ({
+                  key: stock.id,
+                  kind: 'existing' as const,
+                  stock,
+                })),
               ]
 
               const columns: TableProps<StockTableRecord>['columns'] = [
                 {
                   title: '序号',
                   dataIndex: 'index',
-                  width: 70,
-                  render: (_value, record) => (record.kind === 'existing' ? record.order : '-'),
+                  width: 90,
+                  render: (_value, record) => {
+                    if (record.kind === 'new') return '-'
+                    if (editingStockId === record.stock.id) {
+                      return (
+                        <InputNumber
+                          min={1}
+                          precision={0}
+                          value={editingStockValue.serialNumber ?? undefined}
+                          onChange={(value) =>
+                            setEditingStockValue((prev) => ({
+                              ...prev,
+                              serialNumber: typeof value === 'number' ? value : null,
+                            }))
+                          }
+                        />
+                      )
+                    }
+                    return record.stock.serialNumber ?? '-'
+                  },
                 },
                 {
                   title: '核销码',
@@ -853,7 +913,7 @@ export default function PackageDetailPage() {
                         <Typography.Text style={{ maxWidth: 140 }} ellipsis={{ tooltip: link }}>
                           {compact}…
                         </Typography.Text>
-                        <Button size="small" onClick={() => void copyShareLink(record.stock)}>
+                        <Button size="small" onClick={() => void copyStockSummary(record.stock)}>
                           复制
                         </Button>
                       </Space>
@@ -948,7 +1008,7 @@ export default function PackageDetailPage() {
         onOk={() => void handleQuickEntrySubmit()}
         confirmLoading={quickEntrySubmitting}
         onCancel={() => setQuickEntryVisible(false)}
-        destroyOnClose
+        forceRender
       >
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
           订单号格式：102 + 购买年月日（YYYYMMDD）+ 13 位随机数字，核销有效期将根据订单日期与天数自动计算。

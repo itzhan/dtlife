@@ -61,12 +61,28 @@ const deriveValidUntil = (orderNumber: string | null, validDays: number | null, 
   return fallback
 }
 
+const parseSerialNumber = (value: unknown) => {
+  if (value == null) return null
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return null
+  const intValue = Math.trunc(num)
+  if (intValue <= 0) return null
+  return intValue
+}
+
 export async function PUT(req: NextRequest, context: RouteContext) {
   const { stockId } = await extractParams(context)
   if (!stockId) return NextResponse.json({ message: '缺少 stockId' }, { status: 400 })
   const s = await readAdminSession()
   if (!s) return NextResponse.json({ message: '未认证' }, { status: 401 })
-  const body = (await req.json().catch(() => null)) as { code?: string; validDate?: string | null; orderNumber?: string | null; validDays?: number | null; used?: boolean } | null
+  const body = (await req.json().catch(() => null)) as {
+    code?: string
+    validDate?: string | null
+    orderNumber?: string | null
+    validDays?: number | null
+    serialNumber?: number | null
+    used?: boolean
+  } | null
   if (!body) return NextResponse.json({ message: '请求体无效' }, { status: 400 })
 
   const existing = await prisma.stock.findUnique({ where: { id: stockId } })
@@ -102,6 +118,11 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       nextValidDays = parsedValidDays
       data.validDays = parsedValidDays
     }
+  }
+  if (body.serialNumber !== undefined) {
+    const parsedSerial = parseSerialNumber(body.serialNumber)
+    if (parsedSerial == null) return NextResponse.json({ message: '序号格式不正确', code: 'INVALID_SERIAL_NUMBER' }, { status: 400 })
+    data.serialNumber = parsedSerial
   }
   if (body.validDate !== undefined) {
     const parsed = parseValidDate(body.validDate)

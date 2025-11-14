@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import { prisma } from '@/lib/prisma'
@@ -124,26 +125,39 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   if (targets.length === 0) return NextResponse.json({ message: '无有效核销码' }, { status: 400 })
 
-  const operations = targets.map(({ code, validUntil, orderNumber, validDays }) =>
-    prisma.stock.create({
-      data: {
-        code,
-        validUntil: validUntil ?? undefined,
-        orderNumber: orderNumber ?? undefined,
-        validDays: validDays ?? undefined,
-        package: { connect: { id } },
-      },
-    })
-  )
+  const [{ _max }, totalCount] = await Promise.all([
+    prisma.stock.aggregate({
+      where: { packageId: id },
+      _max: { serialNumber: true },
+    }),
+    prisma.stock.count({ where: { packageId: id } }),
+  ])
+  let currentSerial = _max.serialNumber ?? totalCount
+
   let created = 0
-  for (const op of operations) {
+  for (const { code, validUntil, orderNumber, validDays } of targets) {
+    const nextSerial = currentSerial + 1
     try {
-      await op
+      await prisma.stock.create({
+        data: {
+          code,
+          serialNumber: nextSerial,
+          validUntil: validUntil ?? undefined,
+          orderNumber: orderNumber ?? undefined,
+          validDays: validDays ?? undefined,
+          package: { connect: { id } },
+        },
+      })
+      currentSerial = nextSerial
       created += 1
-    } catch {
-      // 唯一键冲突时忽略，让流程继续
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        continue
+      }
+      throw error
     }
   }
+
   return NextResponse.json({ ok: true, created, requested: targets.length })
 }
 
