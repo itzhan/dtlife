@@ -479,10 +479,6 @@ function OrderDetailPageInner() {
               <span className="info-row__label">有效期至：</span>
               <span className="info-row__value">{time_valid ?? "长期有效"}</span>
             </div>
-            <div className="info-row">
-              <span className="info-row__label">备注：</span>
-              <span className="info-row__value">{pkg.remark || "暂无备注"}</span>
-            </div>
             {showOriginalPrice && (
               <div className="info-row info-row--payment">
                 <span className="info-row__label">原        价：</span>
