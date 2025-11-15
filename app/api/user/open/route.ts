@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
       storeSourceId: pkg.storeSourceId,
       useLink: pkg.useLink,
       validUntil: pkg.validUntil ? pkg.validUntil.toISOString() : null,
+      remark: pkg.remark,
       userPoints: pkg.userPoints,
       storeId: pkg.storeId,
       goodsId: pkg.goodsId,

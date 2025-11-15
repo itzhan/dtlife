@@ -30,6 +30,7 @@ type Pkg = {
   id: string
   name: string
   description?: string | null
+  remark?: string | null
   priceCents: number
   originalPriceCents: number
   coverImageUrl?: string | null
@@ -73,6 +74,7 @@ type UpdateFormValues = {
   primaryStoreName?: string
   primaryStoreAddress?: string
   primaryStorePhone?: string
+  remark?: string
 }
 type PackageItemFormValues = { packageItems?: PackageItemFormRow[] }
 type NewStockFormValues = { newStocks?: { code?: string; orderNumber?: string; validDays?: number | null }[] }
@@ -165,6 +167,7 @@ export default function PackageDetailPage() {
             primaryStoreName: pkgData.primaryStoreName ?? '',
             primaryStoreAddress: pkgData.primaryStoreAddress ?? '',
             primaryStorePhone: pkgData.primaryStorePhone ?? '',
+            remark: pkgData.remark ?? '',
           })
           packageForm.setFieldsValue({
             packageItems: (pkgData.packageItems ?? []).map((item) => ({
@@ -219,6 +222,8 @@ export default function PackageDetailPage() {
   const onUpdate = async (values: UpdateFormValues) => {
     const payload: Record<string, unknown> = {}
     payload.name = values.name
+    const remarkValue = (values.remark ?? '').trim()
+    payload.remark = remarkValue
     payload.description = pkg?.description ?? ''
     const normalizedPrice = Number(values.priceYuan ?? 0)
     payload.priceYuan = normalizedPrice
@@ -347,7 +352,7 @@ export default function PackageDetailPage() {
     const serialPrefix = typeof stock.serialNumber === 'number' ? `${stock.serialNumber}.` : ''
     const orderText = stock.orderNumber?.trim() || '无订单号'
     const validText = resolveValidUntilForCopy(stock)
-    const remark = (pkg?.description ?? '').trim() || '无备注'
+    const remark = ((pkg?.remark ?? pkg?.description ?? '').trim()) || '无备注'
     const payload = `${serialPrefix}订单：${orderText}\n核销地址：${link}\n有效期：${validText ? `${validText}日` : '-'}\n备注：${remark}`
     try {
       if (navigator?.clipboard?.writeText) {
@@ -551,9 +556,10 @@ export default function PackageDetailPage() {
             {
               key: 'more',
               label: '更多信息',
-              children: (
-                <Descriptions column={1} size="small">
-                  <Descriptions.Item label="描述">{pkg?.description || '-'}</Descriptions.Item>
+                  children: (
+                    <Descriptions column={1} size="small">
+                      <Descriptions.Item label="备注">{pkg?.remark || '-'}</Descriptions.Item>
+                      <Descriptions.Item label="描述">{pkg?.description || '-'}</Descriptions.Item>
                   <Descriptions.Item label="卡号">{pkg?.cardNumber || '-'}</Descriptions.Item>
                   <Descriptions.Item label="核销码类型">{pkg?.goodsCodeType ?? '-'}</Descriptions.Item>
                   <Descriptions.Item label="门店来源ID">{pkg?.storeSourceId ?? '-'}</Descriptions.Item>
@@ -607,6 +613,9 @@ export default function PackageDetailPage() {
           </Form.Item>
           <Form.Item name="primaryStorePhone" label="展示门店电话">
             <Input placeholder="0571-XXXXXXX" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="例如：仅限工作日使用；需预约" />
           </Form.Item>
 
           <Form.Item style={{ marginTop: 24 }}>

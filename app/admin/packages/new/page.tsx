@@ -12,6 +12,7 @@ type NewPackageFormValues = {
   primaryStoreName?: string
   primaryStoreAddress?: string
   primaryStorePhone?: string
+  remark?: string
   packageItems?: PackageItemFormValue[]
 }
 
@@ -21,9 +22,11 @@ export default function NewPackagePage() {
 
   const onFinish = async (values: NewPackageFormValues) => {
     const normalizedPrice = Number(values.priceYuan ?? 0)
+    const remarkValue = (values.remark ?? '').trim()
     const body = {
       name: values.name,
       description: '',
+      remark: remarkValue || null,
       priceYuan: normalizedPrice,
       originalPriceYuan: normalizedPrice,
       coverImageUrl: (values.coverImageUrl || '').trim() || null,
@@ -85,6 +88,9 @@ export default function NewPackagePage() {
           </Form.Item>
           <Form.Item name="primaryStorePhone" label="展示门店电话">
             <Input placeholder="0571-XXXXXXX" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="例如：仅限2人使用；不含饮料" />
           </Form.Item>
 
           <Typography.Title level={5}>套餐信息列表</Typography.Title>

@@ -30,6 +30,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   const body = await req.json().catch(() => null) as {
     name?: string
     description?: string | null
+    remark?: string | null
     priceCents?: number
     priceYuan?: number
     originalPriceCents?: number
@@ -52,16 +53,17 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   } | null
   if (!body) return NextResponse.json({ message: '请求体无效' }, { status: 400 })
   const data: Prisma.PackageUpdateInput = {}
-  if (body.name) data.name = body.name
-  if (body.description !== undefined) data.description = body.description ?? null
-  const parseNumber = (value: unknown) => {
-    const num = Number(value)
-    return Number.isFinite(num) ? num : null
-  }
   const parseString = (value: unknown) => {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+  }
+  if (body.name) data.name = body.name
+  if (body.description !== undefined) data.description = body.description ?? null
+  if (body.remark !== undefined) data.remark = parseString(body.remark)
+  const parseNumber = (value: unknown) => {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
   }
   const normalizeStoreDetails = (input: unknown): Prisma.JsonValue | null => {
     if (!Array.isArray(input)) return null

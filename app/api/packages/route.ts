@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null) as {
     name?: string
     description?: string | null
+    remark?: string | null
     priceCents?: number
     priceYuan?: number
     originalPriceCents?: number
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
     data: {
       name: body.name,
       description: body.description ?? null,
+      remark: parseString(body.remark),
       priceCents: Math.max(0, price),
       originalPriceCents: Math.max(0, originalPrice),
       coverImageUrl: parseString(body.coverImageUrl),

@@ -31,6 +31,7 @@ type UserOpenResponse = {
     id: string
     name: string
     description: string | null
+    remark: string | null
     priceCents: number | null
     originalPriceCents: number | null
     coverImageUrl: string | null
@@ -58,14 +59,16 @@ const formatPrice = (priceCents?: number | null) => {
 
 const formatDateWithTime = (input?: string | null) => {
   if (!input) return null
+  const d = new Date(input)
+  const pad = (num: number) => String(num).padStart(2, "0")
+  if (!Number.isNaN(d.valueOf())) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} 23:59:59`
+  }
   const dateMatch = input.match(/\d{4}-\d{1,2}-\d{1,2}/)
   if (dateMatch) {
     return `${dateMatch[0]} 23:59:59`
   }
-  const d = new Date(input)
-  if (Number.isNaN(d.valueOf())) return null
-  const pad = (num: number) => String(num).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} 23:59:59`
+  return null
 }
 
 const normalizeGoodsCodeType = (value?: number | null): GoodsCodeType => {
@@ -475,6 +478,10 @@ function OrderDetailPageInner() {
             <div className="info-row">
               <span className="info-row__label">有效期至：</span>
               <span className="info-row__value">{time_valid ?? "长期有效"}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-row__label">备注：</span>
+              <span className="info-row__value">{pkg.remark || "暂无备注"}</span>
             </div>
             {showOriginalPrice && (
               <div className="info-row info-row--payment">

@@ -12,6 +12,7 @@ model Package {
   id          String   @id @default(uuid())
   name        String
   description String?
+  remark      String?
   priceCents  Int      @default(0)
   originalPriceCents Int      @default(0)
   coverImageUrl     String?
